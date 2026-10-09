@@ -1,0 +1,52 @@
+### Gradle ###
+.gradle
+**/build/
+gradle-app.setting
+.gradletasknamecache
+
+### Java ###
+*.class
+*.log
+*.jar
+*.war
+*.hprof
+hs_err_pid*
+!gradle-wrapper.jar
+
+### IDEs ###
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.classpath
+.project
+.settings/
+bin/
+.factorypath
+.apt_generated/
+
+### OS ###
+.DS_Store
+Thumbs.db
+[Dd]esktop.ini
+
+### Terraform ###
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+### Env ###
+.env
