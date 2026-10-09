@@ -5,6 +5,7 @@ import co.com.franquicias.model.exceptions.TechnicalException;
 import co.com.franquicias.model.franchise.Branch;
 import co.com.franquicias.model.franchise.Franchise;
 import co.com.franquicias.model.franchise.Product;
+import co.com.franquicias.model.franchise.gateways.FranchiseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
@@ -29,10 +30,11 @@ import static java.util.stream.Collectors.toList;
 
 @Repository
 @RequiredArgsConstructor
-public class DynamoFranchiseRepository {
+public class DynamoFranchiseRepository implements FranchiseRepository {
 
     private final DynamoDbAsyncTable<FranchiseItem> table;
 
+    @Override
     public Mono<Franchise> findById(String franchiseId) {
         QueryConditional byFranchise = QueryConditional.keyEqualTo(
                 Key.builder().partitionValue(franchisePk(franchiseId)).build());
@@ -42,6 +44,7 @@ public class DynamoFranchiseRepository {
                 .flatMap(items -> Mono.justOrEmpty(toFranchise(items)));
     }
 
+    @Override
     public Mono<Franchise> saveFranchise(Franchise franchise) {
         return put(FranchiseItem.builder()
                 .pk(franchisePk(franchise.id()))
@@ -53,6 +56,7 @@ public class DynamoFranchiseRepository {
                 .thenReturn(franchise);
     }
 
+    @Override
     public Mono<Branch> saveBranch(String franchiseId, Branch branch) {
         return put(FranchiseItem.builder()
                 .pk(franchisePk(franchiseId))
@@ -64,6 +68,7 @@ public class DynamoFranchiseRepository {
                 .thenReturn(branch);
     }
 
+    @Override
     public Mono<Product> saveProduct(String franchiseId, String branchId, Product product) {
         return put(FranchiseItem.builder()
                 .pk(franchisePk(franchiseId))
@@ -75,6 +80,17 @@ public class DynamoFranchiseRepository {
                 .stock(product.stock())
                 .build())
                 .thenReturn(product);
+    }
+
+    @Override
+    public Mono<Void> deleteProduct(String franchiseId, String branchId, String productId) {
+        Key key = Key.builder()
+                .partitionValue(franchisePk(franchiseId))
+                .sortValue(productSk(branchId, productId))
+                .build();
+        return Mono.fromFuture(() -> table.deleteItem(key))
+                .onErrorMap(TechnicalException::new)
+                .then();
     }
 
     private Mono<Void> put(FranchiseItem item) {

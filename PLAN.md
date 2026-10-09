@@ -97,7 +97,7 @@ El README se actualiza en la misma rama que introduce cada funcionalidad, para q
    - `feat(dynamo): agrega entidad single-table con PK/SK`
    - `feat(dynamo): implementa guardado de franquicia, sucursal y producto`
    - `feat(dynamo): implementa consulta de franquicia por PK`
-   - `feat(dynamo): implementa actualización y eliminación de items`
+   - `feat(dynamo): implementa eliminación de producto y conecta el gateway` (las actualizaciones usan el mismo `save`: `PutItem` crea o reemplaza)
    - `test(dynamo): agrega pruebas del adapter`
    - `build: agrega reporte de cobertura unificado y umbral mínimo` (Jacoco, 80 % de líneas; falla el build si baja)
 4. `feature/entorno-local`
