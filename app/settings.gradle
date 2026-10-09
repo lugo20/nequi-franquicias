@@ -10,3 +10,7 @@ include ':model'
 include ':usecase'
 project(':model').projectDir = file('./domain/model')
 project(':usecase').projectDir = file('./domain/usecase')
+include ':dynamo-db'
+include ':reactive-web'
+project(':dynamo-db').projectDir = file('./infrastructure/driven-adapters/dynamo-db')
+project(':reactive-web').projectDir = file('./infrastructure/entry-points/reactive-web')
