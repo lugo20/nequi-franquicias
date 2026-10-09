@@ -69,12 +69,12 @@ class DynamoFranchiseRepositoryTest {
         verify(client).transactWriteItems(captor.capture());
         List<Put> puts = captor.getValue().transactWriteItems().stream().map(item -> item.put()).toList();
         assertEquals(2, puts.size());
-        assertEquals("FRANCHISE#f1", puts.get(0).item().get("pk").s());
-        assertEquals("FRANCHISE", puts.get(0).item().get("sk").s());
+        assertEquals("FRANCHISE#f1", puts.get(0).item().get("franchiseKey").s());
+        assertEquals("FRANCHISE", puts.get(0).item().get("entityKey").s());
         assertNull(puts.get(0).conditionExpression());
-        assertEquals("FRANCHISE_NAME#cafe express", puts.get(1).item().get("pk").s());
+        assertEquals("FRANCHISE_NAME#cafe express", puts.get(1).item().get("franchiseKey").s());
         assertEquals("f1", puts.get(1).item().get("id").s());
-        assertEquals("attribute_not_exists(pk)", puts.get(1).conditionExpression());
+        assertEquals("attribute_not_exists(franchiseKey)", puts.get(1).conditionExpression());
     }
 
     @Test
@@ -114,8 +114,8 @@ class DynamoFranchiseRepositoryTest {
                 .verifyComplete();
 
         FranchiseItem item = capturePut();
-        assertEquals("FRANCHISE#f1", item.getPk());
-        assertEquals("BRANCH#b1", item.getSk());
+        assertEquals("FRANCHISE#f1", item.getFranchiseKey());
+        assertEquals("BRANCH#b1", item.getEntityKey());
         assertEquals("BRANCH", item.getType());
         assertNull(item.getStock());
     }
@@ -130,8 +130,8 @@ class DynamoFranchiseRepositoryTest {
                 .verifyComplete();
 
         FranchiseItem item = capturePut();
-        assertEquals("FRANCHISE#f1", item.getPk());
-        assertEquals("BRANCH#b1#PRODUCT#p1", item.getSk());
+        assertEquals("FRANCHISE#f1", item.getFranchiseKey());
+        assertEquals("BRANCH#b1#PRODUCT#p1", item.getEntityKey());
         assertEquals("b1", item.getBranchId());
         assertEquals(7, item.getStock());
     }
@@ -215,7 +215,7 @@ class DynamoFranchiseRepositoryTest {
                 .thenReturn(PagePublisher.create(SdkPublisher.adapt(Flux.just(Page.builder(FranchiseItem.class).items(items).build()))));
     }
 
-    private static FranchiseItem item(String sk, String type, String id, String branchId, String name, Integer stock) {
-        return new FranchiseItem("FRANCHISE#f1", sk, type, id, branchId, name, stock);
+    private static FranchiseItem item(String entityKey, String type, String id, String branchId, String name, Integer stock) {
+        return new FranchiseItem("FRANCHISE#f1", entityKey, type, id, branchId, name, stock);
     }
 }
