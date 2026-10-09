@@ -110,10 +110,10 @@ Los errores responden siempre con el status HTTP correspondiente y el cuerpo:
 |---|---|
 | 400 | `INVALID_NAME`, `INVALID_STOCK`, `INVALID_REQUEST` (JSON mal formado o sin cuerpo) |
 | 404 | `FRANCHISE_NOT_FOUND`, `BRANCH_NOT_FOUND`, `PRODUCT_NOT_FOUND` |
-| 409 | `BRANCH_NAME_DUPLICATED`, `PRODUCT_NAME_DUPLICATED` |
+| 409 | `FRANCHISE_NAME_DUPLICATED`, `BRANCH_NAME_DUPLICATED`, `PRODUCT_NAME_DUPLICATED` |
 | 500 | `TECHNICAL_ERROR` |
 
-Los nombres se guardan sin espacios al inicio ni al final; un nombre vacío o solo con espacios es inválido.
+Los nombres se guardan sin espacios al inicio ni al final; un nombre vacío o solo con espacios es inválido. El nombre de una franquicia es único sin distinguir mayúsculas: `Cafe Express` y `cafe express` son el mismo.
 
 ### Crear franquicia
 
@@ -129,7 +129,7 @@ Respuesta `201 Created`:
 { "id": "475b86b9-bd05-409c-8a61-1753882b4c5c" }
 ```
 
-Errores: `400 INVALID_NAME`, `400 INVALID_REQUEST`.
+Errores: `400 INVALID_NAME`, `400 INVALID_REQUEST`, `409 FRANCHISE_NAME_DUPLICATED`.
 
 ## Pruebas y cobertura
 

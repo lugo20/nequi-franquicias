@@ -21,10 +21,10 @@ Plan de implementación de la prueba técnica Nequi: API para gestionar franquic
 
 ### Reglas de negocio
 
-- Nombre obligatorio en franquicias, sucursales y productos (400).
+- Nombre obligatorio en franquicias, sucursales y productos (400); se recortan los espacios al inicio y al final.
 - Stock obligatorio y `>= 0` (400).
-- Nombre único entre sucursales de una franquicia y entre productos de una sucursal (409).
-- Las franquicias pueden repetir nombre; su identidad es un UUID.
+- Nombre único entre sucursales de una franquicia y entre productos de una sucursal (409), sin distinguir mayúsculas.
+- El nombre de la franquicia es único en todo el sistema (409), sin distinguir mayúsculas; se garantiza con un ítem de reserva de nombre escrito en la misma transacción que la franquicia. Su identidad es un UUID.
 - Recurso inexistente (404).
 - Producto con más stock: uno por sucursal; en empate, el primero por nombre; sucursales sin productos se omiten.
 
@@ -33,6 +33,7 @@ Plan de implementación de la prueba técnica Nequi: API para gestionar franquic
 | Ítem | PK | SK |
 |---|---|---|
 | Franquicia | `FRANCHISE#<fid>` | `FRANCHISE` |
+| Reserva de nombre de franquicia | `FRANCHISE_NAME#<nombre en minúsculas>` | `FRANCHISE_NAME` |
 | Sucursal | `FRANCHISE#<fid>` | `BRANCH#<bid>` |
 | Producto | `FRANCHISE#<fid>` | `BRANCH#<bid>#PRODUCT#<pid>` |
 
