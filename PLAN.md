@@ -11,7 +11,7 @@ Plan de implementación de la prueba técnica Nequi: API para gestionar franquic
 | Commits | Conventional commits en español; código en inglés |
 | Aplicación | Spring Boot 3.5, Java 21, WebFlux (reactivo), clean architecture |
 | Persistencia | DynamoDB, diseño single-table |
-| API | REST plano con códigos HTTP; errores `{code, message}` |
+| API | Acción en la URL (`/create`, `/update-name`…), solo GET, POST y DELETE; POST recibe todo en el body; códigos HTTP; errores `{code, message}` |
 | Local | docker-compose con DynamoDB Local; Dockerfile multi-stage |
 | Nube | AWS us-east-1: ECS Fargate + ALB público HTTP |
 | Red | VPC nueva, tasks en subnets públicas sin NAT; SG de tasks solo acepta tráfico del ALB |
@@ -30,28 +30,32 @@ Plan de implementación de la prueba técnica Nequi: API para gestionar franquic
 
 ### Modelo DynamoDB (single-table)
 
-| Ítem | PK | SK |
+Claves: `franchiseKey` (partición) y `entityKey` (ordenamiento).
+
+| Ítem | franchiseKey | entityKey |
 |---|---|---|
 | Franquicia | `FRANCHISE#<fid>` | `FRANCHISE` |
-| Reserva de nombre de franquicia | `FRANCHISE_NAME#<nombre en minúsculas>` | `FRANCHISE_NAME` |
 | Sucursal | `FRANCHISE#<fid>` | `BRANCH#<bid>` |
 | Producto | `FRANCHISE#<fid>` | `BRANCH#<bid>#PRODUCT#<pid>` |
+| Reserva de nombre de franquicia | `FRANCHISE_NAME#<nombre en minúsculas>` | `FRANCHISE_NAME` |
 
-Un `Query` por PK trae la franquicia completa.
+Un `Query` por `franchiseKey` trae la franquicia completa. La reserva de nombre guarda el `franchiseId` dueño del nombre.
 
 ## Endpoints (`/api/v1`)
 
-| Método | Ruta | Respuesta |
-|---|---|---|
-| POST | `/franchises` | 201 |
-| PATCH | `/franchises/{fid}/name` | 200 |
-| POST | `/franchises/{fid}/branches` | 201 |
-| PATCH | `/franchises/{fid}/branches/{bid}/name` | 200 |
-| POST | `/franchises/{fid}/branches/{bid}/products` | 201 |
-| DELETE | `/franchises/{fid}/branches/{bid}/products/{pid}` | 204 |
-| PATCH | `/franchises/{fid}/branches/{bid}/products/{pid}/stock` | 200 |
-| PATCH | `/franchises/{fid}/branches/{bid}/products/{pid}/name` | 200 |
-| GET | `/franchises/{fid}/products/top-stock` | 200 |
+POST lleva todos los parámetros en el body; GET y DELETE, en la URL. No hay endpoints de consulta o listado: el consumidor guarda los ids que devuelve cada `create`.
+
+| Método | Ruta | Parámetros | Respuesta |
+|---|---|---|---|
+| POST | `/franchises/create` | `{name}` | 201 `{id}` |
+| POST | `/franchises/update-name` | `{franchiseId, name}` | 200 |
+| GET | `/franchises/{franchiseId}/get-top-stock` | URL | 200 |
+| POST | `/branches/create` | `{franchiseId, name}` | 201 `{id}` |
+| POST | `/branches/update-name` | `{franchiseId, branchId, name}` | 200 |
+| POST | `/products/create` | `{franchiseId, branchId, name, stock}` | 201 `{id}` |
+| POST | `/products/update-stock` | `{franchiseId, branchId, productId, stock}` | 200 |
+| POST | `/products/update-name` | `{franchiseId, branchId, productId, name}` | 200 |
+| DELETE | `/products/{franchiseId}/{branchId}/{productId}/delete` | URL | 204 |
 
 ## Estructura
 
@@ -113,6 +117,7 @@ Cada commit incluye las pruebas de su código: el build exige 80 % de cobertura 
 6. `feature/crear-franquicia`
    - `feat(usecase): agrega caso de uso crear franquicia`
    - `feat(api): expone POST /franchises` (crea `RouterRest`)
+   - Ajuste posterior (`feature/ajusta-api-y-modelo`): ruta a `/franchises/create`, claves `franchiseKey`/`entityKey`.
    - `docs: documenta POST /franchises en el README`
 
 ### Fase B - Walking skeleton en AWS
