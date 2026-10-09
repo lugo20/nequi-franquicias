@@ -36,6 +36,7 @@ class GlobalErrorHandlerTest {
     @Test
     void statusMapping() {
         assertEquals(HttpStatus.NOT_FOUND, GlobalErrorHandler.statusOf(TechnicalMessage.FRANCHISE_NOT_FOUND));
+        assertEquals(HttpStatus.CONFLICT, GlobalErrorHandler.statusOf(TechnicalMessage.FRANCHISE_NAME_DUPLICATED));
         assertEquals(HttpStatus.CONFLICT, GlobalErrorHandler.statusOf(TechnicalMessage.BRANCH_NAME_DUPLICATED));
         assertEquals(HttpStatus.BAD_REQUEST, GlobalErrorHandler.statusOf(TechnicalMessage.INVALID_STOCK));
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, GlobalErrorHandler.statusOf(TechnicalMessage.TECHNICAL_ERROR));
