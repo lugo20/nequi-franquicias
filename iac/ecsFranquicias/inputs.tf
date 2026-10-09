@@ -42,3 +42,8 @@ variable "log_retention_days" {
   description = "Days the application logs are kept in CloudWatch."
   type        = number
 }
+
+variable "desired_count" {
+  description = "Number of tasks running."
+  type        = number
+}

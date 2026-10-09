@@ -6,3 +6,4 @@ task_cpu           = 512
 task_memory        = 1024
 app_port           = 8080
 log_retention_days = 7
+desired_count      = 1

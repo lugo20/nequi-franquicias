@@ -97,3 +97,44 @@ resource "aws_ecs_task_definition" "app" {
     }
   }])
 }
+
+################################################################################
+# Service - Keeps the tasks running and registered in the ALB target group
+################################################################################
+
+resource "aws_ecs_service" "app" {
+  name            = local.name
+  cluster         = local.transversal.ecs_cluster_name
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = var.desired_count
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    weight            = 1
+  }
+
+  network_configuration {
+    subnets         = local.transversal.public_subnet_ids
+    security_groups = [local.transversal.tasks_security_group_id]
+    # Public subnets without NAT: the public IP lets the task reach ECR, DynamoDB and CloudWatch.
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = local.transversal.target_group_arn
+    container_name   = var.project
+    container_port   = var.app_port
+  }
+
+  # Time for Spring Boot to start before the ALB health checks count.
+  health_check_grace_period_seconds = 60
+
+  # A deployment that never becomes healthy is rolled back to the previous version.
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  # terraform apply waits until the tasks are healthy, so a failed deploy fails the apply.
+  wait_for_steady_state = true
+}
