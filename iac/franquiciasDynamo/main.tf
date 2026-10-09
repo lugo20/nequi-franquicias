@@ -5,16 +5,16 @@
 resource "aws_dynamodb_table" "franchises" {
   name         = local.table_name
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "pk"
-  range_key    = "sk"
+  hash_key     = "franchiseKey"
+  range_key    = "entityKey"
 
   attribute {
-    name = "pk"
+    name = "franchiseKey"
     type = "S"
   }
 
   attribute {
-    name = "sk"
+    name = "entityKey"
     type = "S"
   }
 

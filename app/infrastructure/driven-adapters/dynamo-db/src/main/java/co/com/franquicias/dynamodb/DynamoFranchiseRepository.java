@@ -30,10 +30,10 @@ import static co.com.franquicias.dynamodb.entity.FranchiseItem.BRANCH;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.FRANCHISE;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.FRANCHISE_NAME;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.PRODUCT;
-import static co.com.franquicias.dynamodb.entity.FranchiseItem.branchSk;
-import static co.com.franquicias.dynamodb.entity.FranchiseItem.franchiseNamePk;
-import static co.com.franquicias.dynamodb.entity.FranchiseItem.franchisePk;
-import static co.com.franquicias.dynamodb.entity.FranchiseItem.productSk;
+import static co.com.franquicias.dynamodb.entity.FranchiseItem.branchEntityKey;
+import static co.com.franquicias.dynamodb.entity.FranchiseItem.franchiseNameKey;
+import static co.com.franquicias.dynamodb.entity.FranchiseItem.franchiseKey;
+import static co.com.franquicias.dynamodb.entity.FranchiseItem.productEntityKey;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
@@ -42,7 +42,7 @@ import static java.util.stream.Collectors.toList;
 @RequiredArgsConstructor
 public class DynamoFranchiseRepository implements FranchiseRepository {
 
-    private static final Expression NOT_EXISTS = Expression.builder().expression("attribute_not_exists(pk)").build();
+    private static final Expression NOT_EXISTS = Expression.builder().expression("attribute_not_exists(franchiseKey)").build();
     private static final String CONDITION_FAILED = "ConditionalCheckFailed";
 
     private final DynamoDbAsyncTable<FranchiseItem> table;
@@ -51,7 +51,7 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
     @Override
     public Mono<Franchise> findById(String franchiseId) {
         QueryConditional byFranchise = QueryConditional.keyEqualTo(
-                Key.builder().partitionValue(franchisePk(franchiseId)).build());
+                Key.builder().partitionValue(franchiseKey(franchiseId)).build());
         return Flux.defer(() -> Flux.from(table.query(byFranchise).items()))
                 .collectList()
                 .onErrorMap(TechnicalException::new)
@@ -62,15 +62,15 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
     @Override
     public Mono<Franchise> saveFranchise(Franchise franchise) {
         FranchiseItem franchiseItem = FranchiseItem.builder()
-                .pk(franchisePk(franchise.id()))
-                .sk(FRANCHISE)
+                .franchiseKey(franchiseKey(franchise.id()))
+                .entityKey(FRANCHISE)
                 .type(FRANCHISE)
                 .id(franchise.id())
                 .name(franchise.name())
                 .build();
         FranchiseItem nameReservation = FranchiseItem.builder()
-                .pk(franchiseNamePk(franchise.name()))
-                .sk(FRANCHISE_NAME)
+                .franchiseKey(franchiseNameKey(franchise.name()))
+                .entityKey(FRANCHISE_NAME)
                 .type(FRANCHISE_NAME)
                 .id(franchise.id())
                 .name(franchise.name())
@@ -90,8 +90,8 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
     @Override
     public Mono<Branch> saveBranch(String franchiseId, Branch branch) {
         return put(FranchiseItem.builder()
-                .pk(franchisePk(franchiseId))
-                .sk(branchSk(branch.id()))
+                .franchiseKey(franchiseKey(franchiseId))
+                .entityKey(branchEntityKey(branch.id()))
                 .type(BRANCH)
                 .id(branch.id())
                 .name(branch.name())
@@ -102,8 +102,8 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
     @Override
     public Mono<Product> saveProduct(String franchiseId, String branchId, Product product) {
         return put(FranchiseItem.builder()
-                .pk(franchisePk(franchiseId))
-                .sk(productSk(branchId, product.id()))
+                .franchiseKey(franchiseKey(franchiseId))
+                .entityKey(productEntityKey(branchId, product.id()))
                 .type(PRODUCT)
                 .id(product.id())
                 .branchId(branchId)
@@ -116,8 +116,8 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
     @Override
     public Mono<Void> deleteProduct(String franchiseId, String branchId, String productId) {
         Key key = Key.builder()
-                .partitionValue(franchisePk(franchiseId))
-                .sortValue(productSk(branchId, productId))
+                .partitionValue(franchiseKey(franchiseId))
+                .sortValue(productEntityKey(branchId, productId))
                 .build();
         return Mono.fromFuture(() -> table.deleteItem(key))
                 .onErrorMap(TechnicalException::new)

@@ -12,11 +12,12 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 public class RouterRest {
 
     private static final String FRANCHISES = "/api/v1/franchises";
+    private static final String CREATE = "/create";
 
     @Bean
     public RouterFunction<ServerResponse> routerFunction(FranchiseHandler franchiseHandler) {
         return route()
-                .POST(FRANCHISES, franchiseHandler::createFranchise)
+                .POST(FRANCHISES + CREATE, franchiseHandler::createFranchise)
                 .build();
     }
 }

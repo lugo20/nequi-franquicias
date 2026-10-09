@@ -73,7 +73,7 @@ class FranchiseRouterTest {
 
     @Test
     void createFranchiseReturns400WhenBodyIsEmpty() {
-        client.post().uri("/api/v1/franchises")
+        client.post().uri("/api/v1/franchises/create")
                 .contentType(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isBadRequest()
@@ -81,7 +81,7 @@ class FranchiseRouterTest {
     }
 
     private WebTestClient.ResponseSpec post(String body) {
-        return client.post().uri("/api/v1/franchises")
+        return client.post().uri("/api/v1/franchises/create")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .exchange();

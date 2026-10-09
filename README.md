@@ -47,7 +47,7 @@ Esto levanta tres servicios, en orden:
 | Servicio | Qué hace |
 |---|---|
 | `dynamodb` | DynamoDB Local en memoria, puerto `8000` |
-| `dynamodb-init` | Crea la tabla `franquicias` (PK `pk`, SK `sk`) y termina |
+| `dynamodb-init` | Crea la tabla `franquicias` (claves `franchiseKey` y `entityKey`) y termina |
 | `app` | La API en el puerto `8080`, apuntando a DynamoDB Local |
 
 Verificar que la API está arriba:
@@ -100,7 +100,18 @@ DynamoDB Local acepta cualquier credencial; los valores `local` solo cumplen el 
 
 Base: `http://localhost:8080/api/v1`
 
-Los errores responden siempre con el status HTTP correspondiente y el cuerpo:
+### Convenciones
+
+- La URL indica la acción: `create`, `update-name`, `update-stock`, `get-top-stock`, `delete`.
+- Solo se usan tres métodos: **GET** consulta, **POST** crea o actualiza, **DELETE** elimina.
+- **POST** recibe todos sus parámetros en el body (JSON). **GET** y **DELETE** los reciben en la URL.
+- Cada `create` responde con el `id` generado. **Guárdalo:** las demás operaciones lo piden, y la API no tiene endpoints para listar o buscar.
+- Los nombres se guardan sin espacios al inicio ni al final; un nombre vacío o solo con espacios es inválido.
+- El nombre de una franquicia es único en todo el sistema, sin distinguir mayúsculas: `Cafe Express` y `cafe express` son el mismo. Los nombres de sucursal son únicos dentro de su franquicia, y los de producto dentro de su sucursal.
+
+### Errores
+
+Responden con el status HTTP correspondiente y el cuerpo:
 
 ```json
 { "code": "INVALID_NAME", "message": "El nombre es obligatorio" }
@@ -113,14 +124,12 @@ Los errores responden siempre con el status HTTP correspondiente y el cuerpo:
 | 409 | `FRANCHISE_NAME_DUPLICATED`, `BRANCH_NAME_DUPLICATED`, `PRODUCT_NAME_DUPLICATED` |
 | 500 | `TECHNICAL_ERROR` |
 
-Los nombres se guardan sin espacios al inicio ni al final; un nombre vacío o solo con espacios es inválido. El nombre de una franquicia es único sin distinguir mayúsculas: `Cafe Express` y `cafe express` son el mismo.
-
 ### Crear franquicia
 
-`POST /franchises`
+`POST /franchises/create`
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/franchises   -H "Content-Type: application/json"   -d '{"name": "Cafe Express"}'
+curl -X POST http://localhost:8080/api/v1/franchises/create -H "Content-Type: application/json" -d '{"name": "Cafe Express"}'
 ```
 
 Respuesta `201 Created`:
@@ -130,6 +139,50 @@ Respuesta `201 Created`:
 ```
 
 Errores: `400 INVALID_NAME`, `400 INVALID_REQUEST`, `409 FRANCHISE_NAME_DUPLICATED`.
+
+## Modelo de datos
+
+Todo se guarda en **una sola tabla de DynamoDB** (diseño *single-table*). Cada franquicia forma un **grupo**: la franquicia, sus sucursales y sus productos comparten la misma clave de partición, así que una sola consulta trae la franquicia completa.
+
+### Columnas
+
+| Columna | Descripción |
+|---|---|
+| `franchiseKey` | Clave de partición: **a qué franquicia pertenece** la fila (`FRANCHISE#<franchiseId>`). En las reservas de nombre es `FRANCHISE_NAME#<nombre en minúsculas>` |
+| `entityKey` | Clave de ordenamiento: **qué es la fila** dentro de la franquicia (`FRANCHISE`, `BRANCH#<branchId>`, `BRANCH#<branchId>#PRODUCT#<productId>` o `FRANCHISE_NAME`) |
+| `type` | Tipo de fila: `FRANCHISE`, `BRANCH`, `PRODUCT` o `FRANCHISE_NAME` |
+| `id` | Id de la franquicia, sucursal o producto. En la reserva de nombre, el id de la franquicia dueña |
+| `branchId` | Solo en productos: la sucursal a la que pertenecen |
+| `name` | Nombre |
+| `stock` | Solo en productos: cantidad en stock |
+
+El `#` es solo un separador de texto. Como DynamoDB ordena las filas de un grupo por `entityKey`, cada sucursal queda seguida de sus productos.
+
+### Ejemplo
+
+Franquicia *Cafe Express* con las sucursales *Norte* (productos *Cafe* y *Te*) y *Sur* (producto *Pastel*):
+
+| franchiseKey | entityKey | type | id | branchId | name | stock |
+|---|---|---|---|---|---|---|
+| `FRANCHISE#f1` | `BRANCH#b1` | BRANCH | b1 | | Norte | |
+| `FRANCHISE#f1` | `BRANCH#b1#PRODUCT#p1` | PRODUCT | p1 | b1 | Cafe | 10 |
+| `FRANCHISE#f1` | `BRANCH#b1#PRODUCT#p2` | PRODUCT | p2 | b1 | Te | 3 |
+| `FRANCHISE#f1` | `BRANCH#b2` | BRANCH | b2 | | Sur | |
+| `FRANCHISE#f1` | `BRANCH#b2#PRODUCT#p3` | PRODUCT | p3 | b2 | Pastel | 7 |
+| `FRANCHISE#f1` | `FRANCHISE` | FRANCHISE | f1 | | Cafe Express | |
+| `FRANCHISE_NAME#cafe express` | `FRANCHISE_NAME` | FRANCHISE_NAME | f1 | | Cafe Express | |
+
+### Cómo se usa
+
+| Operación | En la tabla |
+|---|---|
+| Leer una franquicia (para validar o calcular el top de stock) | Un `Query` por `franchiseKey = FRANCHISE#f1` |
+| Crear o actualizar sucursal o producto | Escribe (o reemplaza) solo su fila |
+| Eliminar producto | Borra solo su fila |
+| Crear franquicia | **Transacción:** la fila de la franquicia más su reserva de nombre, con la condición de que la reserva no exista |
+| Renombrar franquicia | **Transacción:** actualiza la franquicia, libera la reserva del nombre viejo y crea la del nuevo |
+
+**Por qué existe la reserva de nombre:** DynamoDB solo garantiza unicidad sobre la clave de una fila. La reserva es una fila cuya clave **es** el nombre; al escribirla con la condición "solo si no existe" dentro de la misma transacción que la franquicia, dos franquicias nunca pueden tener el mismo nombre, ni siquiera si se crean al mismo tiempo.
 
 ## Pruebas y cobertura
 
