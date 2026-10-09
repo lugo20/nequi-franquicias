@@ -9,7 +9,7 @@ output "public_subnet_ids" {
 }
 
 output "alb_dns_name" {
-  description = "Public URL of the API."
+  description = "Internal DNS name of the ALB (not reachable from internet)."
   value       = module.alb.dns_name
 }
 

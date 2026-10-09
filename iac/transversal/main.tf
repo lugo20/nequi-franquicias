@@ -18,7 +18,7 @@ module "vpc" {
 }
 
 ################################################################################
-# ALB - Public HTTP entry point that forwards every request to the application
+# ALB - Internal: only reachable through API Gateway (VPC Link), never from internet
 ################################################################################
 
 module "alb" {
@@ -29,15 +29,16 @@ module "alb" {
   vpc_id  = module.vpc.vpc_id
   subnets = module.vpc.public_subnets
 
+  internal = true
   # Test project: allows a full cleanup with terraform destroy.
   enable_deletion_protection = false
 
   security_group_ingress_rules = {
-    http = {
-      from_port   = 80
-      to_port     = 80
-      ip_protocol = "tcp"
-      cidr_ipv4   = "0.0.0.0/0"
+    http_from_api_gateway = {
+      from_port                    = 80
+      to_port                      = 80
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = aws_security_group.vpc_link.id
     }
   }
   security_group_egress_rules = {
@@ -128,4 +129,44 @@ resource "aws_ecs_cluster_capacity_providers" "this" {
     capacity_provider = "FARGATE"
     weight            = 1
   }
+}
+
+################################################################################
+# API Gateway - Route and private integration to the internal ALB.
+# The API itself (fixed URL) lives in franquiciasApiGateway and is never destroyed.
+################################################################################
+
+resource "aws_security_group" "vpc_link" {
+  name        = "${local.name}-vpc-link"
+  description = "API Gateway VPC Link: outbound only to the ALB"
+  vpc_id      = module.vpc.vpc_id
+}
+
+resource "aws_vpc_security_group_egress_rule" "vpc_link_to_alb" {
+  security_group_id            = aws_security_group.vpc_link.id
+  referenced_security_group_id = module.alb.security_group_id
+  from_port                    = 80
+  to_port                      = 80
+  ip_protocol                  = "tcp"
+}
+
+resource "aws_apigatewayv2_vpc_link" "this" {
+  name               = local.name
+  subnet_ids         = module.vpc.public_subnets
+  security_group_ids = [aws_security_group.vpc_link.id]
+}
+
+resource "aws_apigatewayv2_integration" "alb" {
+  api_id             = local.api_gateway.api_id
+  integration_type   = "HTTP_PROXY"
+  integration_method = "ANY"
+  integration_uri    = module.alb.listeners["http"].arn
+  connection_type    = "VPC_LINK"
+  connection_id      = aws_apigatewayv2_vpc_link.this.id
+}
+
+resource "aws_apigatewayv2_route" "proxy" {
+  api_id    = local.api_gateway.api_id
+  route_key = "ANY /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.alb.id}"
 }

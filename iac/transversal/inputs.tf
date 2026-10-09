@@ -37,3 +37,8 @@ variable "health_check_path" {
   description = "Path the load balancer uses to check the application health."
   type        = string
 }
+
+variable "state_bucket" {
+  description = "Bucket that holds the state of the other components."
+  type        = string
+}
