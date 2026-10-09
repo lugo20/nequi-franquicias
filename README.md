@@ -96,6 +96,41 @@ DynamoDB Local acepta cualquier credencial; los valores `local` solo cumplen el 
 | `DYNAMODB_ENDPOINT` | vacío | Endpoint de DynamoDB. Vacío usa AWS; en local, `http://localhost:8000` |
 | `DYNAMODB_TABLE_NAME` | `franquicias` | Nombre de la tabla |
 
+## API
+
+Base: `http://localhost:8080/api/v1`
+
+Los errores responden siempre con el status HTTP correspondiente y el cuerpo:
+
+```json
+{ "code": "INVALID_NAME", "message": "El nombre es obligatorio" }
+```
+
+| Status | Códigos |
+|---|---|
+| 400 | `INVALID_NAME`, `INVALID_STOCK`, `INVALID_REQUEST` (JSON mal formado o sin cuerpo) |
+| 404 | `FRANCHISE_NOT_FOUND`, `BRANCH_NOT_FOUND`, `PRODUCT_NOT_FOUND` |
+| 409 | `BRANCH_NAME_DUPLICATED`, `PRODUCT_NAME_DUPLICATED` |
+| 500 | `TECHNICAL_ERROR` |
+
+Los nombres se guardan sin espacios al inicio ni al final; un nombre vacío o solo con espacios es inválido.
+
+### Crear franquicia
+
+`POST /franchises`
+
+```bash
+curl -X POST http://localhost:8080/api/v1/franchises   -H "Content-Type: application/json"   -d '{"name": "Cafe Express"}'
+```
+
+Respuesta `201 Created`:
+
+```json
+{ "id": "475b86b9-bd05-409c-8a61-1753882b4c5c" }
+```
+
+Errores: `400 INVALID_NAME`, `400 INVALID_REQUEST`.
+
 ## Pruebas y cobertura
 
 ```bash
