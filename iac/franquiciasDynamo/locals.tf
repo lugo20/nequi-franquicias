@@ -1,10 +1,10 @@
 locals {
-  bucket_name = "${var.project}-tfstate"
+  table_name = "${var.project}-${var.env}"
 
   tags = {
     project    = var.project
     env        = var.env
-    component  = "bootstrap"
+    component  = "franquiciasDynamo"
     managed-by = "terraform"
   }
 }
