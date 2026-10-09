@@ -13,6 +13,7 @@ public enum TechnicalMessage {
     PRODUCT_NAME_DUPLICATED("Ya existe un producto con ese nombre en la sucursal"),
     INVALID_NAME("El nombre es obligatorio"),
     INVALID_STOCK("El stock es obligatorio y debe ser mayor o igual a 0"),
+    INVALID_REQUEST("El cuerpo de la petición es inválido"),
     TECHNICAL_ERROR("Ocurrió un error inesperado, intenta más tarde");
 
     private final String message;

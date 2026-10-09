@@ -80,6 +80,8 @@ Cada componente de `iac/` contiene `main.tf`, `inputs.tf`, `data.tf`, `locals.tf
 
 El README se actualiza en la misma rama que introduce cada funcionalidad, para que la documentación nunca quede desactualizada.
 
+Cada commit incluye las pruebas de su código: el build exige 80 % de cobertura de líneas, así que todos los commits del historial compilan y pasan.
+
 ### Fase A - Base y primer endpoint local
 
 1. `feature/estructura-base`
@@ -105,12 +107,11 @@ El README se actualiza en la misma rama que introduce cada funcionalidad, para q
    - `chore: agrega docker-compose con DynamoDB Local y creación de tabla`
    - `docs: agrega ejecución local al README`
 5. `feature/manejo-errores`
-   - `feat(api): agrega RouterRest base y manejador global de errores HTTP`
-   - `test(api): agrega pruebas del manejador de errores`
+   - `feat(api): agrega manejador global de errores HTTP` (con sus pruebas; agrega `INVALID_REQUEST` para cuerpos inválidos)
+   - `docs: ajusta plan a commits con pruebas incluidas`
 6. `feature/crear-franquicia`
    - `feat(usecase): agrega caso de uso crear franquicia`
-   - `feat(api): expone POST /franchises`
-   - `test(api): agrega pruebas del handler`
+   - `feat(api): expone POST /franchises` (crea `RouterRest`)
    - `docs: documenta POST /franchises en el README`
 
 ### Fase B - Walking skeleton en AWS
@@ -136,7 +137,7 @@ El README se actualiza en la misma rama que introduce cada funcionalidad, para q
 
 ### Fase C - Resto de endpoints
 
-Cada rama: `feat(usecase)` con su test → `feat(api)` handler y ruta → `test(api)` handler → `docs` endpoint en el README.
+Cada rama: `feat(usecase)` con su test → `feat(api)` handler y ruta con su test → `docs` endpoint en el README.
 
 12. `feature/crear-sucursal`
 13. `feature/crear-producto`
