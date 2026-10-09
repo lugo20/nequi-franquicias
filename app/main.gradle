@@ -1,0 +1,70 @@
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'jacoco'
+    apply plugin: 'io.spring.dependency-management'
+
+    compileJava.dependsOn validateStructure
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+    }
+
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'ch.qos.logback'
+                    && (details.requested.name == 'logback-classic' || details.requested.name == 'logback-core')) {
+                details.useVersion "${logbackVersion}"
+            }
+        }
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        implementation 'io.projectreactor:reactor-core'
+        implementation 'io.projectreactor.addons:reactor-extra'
+
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+        testImplementation 'io.projectreactor:reactor-test'
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        compileOnly "org.projectlombok:lombok:${lombokVersion}"
+        annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+        testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        implementation platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+
+        if (!project.name.equalsIgnoreCase(modelModule) && !project.name.equalsIgnoreCase(useCaseModule)) {
+            implementation "ch.qos.logback:logback-classic:${logbackVersion}"
+            implementation "ch.qos.logback:logback-core:${logbackVersion}"
+            implementation "net.logstash.logback:logstash-logback-encoder:${logstashLogbackVersion}"
+        }
+    }
+
+    test.finalizedBy(project.tasks.jacocoTestReport)
+
+    jacocoTestReport {
+        dependsOn test
+        reports {
+            xml.required = true
+            csv.required = false
+            html.outputLocation = layout.buildDirectory.dir("reports/jacocoHtml")
+        }
+    }
+}
+
+jacoco {
+    toolVersion = "${jacocoVersion}"
+}
+
+tasks.named('wrapper') {
+    gradleVersion = '8.14.3'
+    distributionSha256Sum = 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
+}
