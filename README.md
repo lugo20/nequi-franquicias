@@ -184,6 +184,119 @@ Franquicia *Cafe Express* con las sucursales *Norte* (productos *Cafe* y *Te*) y
 
 **Por qué existe la reserva de nombre:** DynamoDB solo garantiza unicidad sobre la clave de una fila. La reserva es una fila cuya clave **es** el nombre; al escribirla con la condición "solo si no existe" dentro de la misma transacción que la franquicia, dos franquicias nunca pueden tener el mismo nombre, ni siquiera si se crean al mismo tiempo.
 
+## Despliegue en AWS
+
+La infraestructura se crea con Terraform en `us-east-1`: DynamoDB, ECR, VPC, ALB público y ECS Fargate. Todos los comandos se ejecutan desde la máquina local.
+
+### Requisitos
+
+- Terraform >= 1.10, AWS CLI v2 y Docker
+- Sesión de AWS con permisos de administrador: `aws login` (o `aws configure`) y región `us-east-1`
+- Verificar con `aws sts get-caller-identity`
+
+### Componentes
+
+Cada carpeta de `iac/` es un componente independiente con su propio state. El state de todos, salvo `bootstrap`, se guarda en el bucket S3 que crea `bootstrap`.
+
+| Componente | Crea |
+|---|---|
+| `bootstrap` | Bucket S3 para el state de Terraform (versionado y cifrado) |
+| `franquiciasDynamo` | Tabla DynamoDB on-demand |
+| `franquiciasEcr` | Repositorio de imágenes (tags inmutables, escaneo, conserva las últimas 5) |
+| `transversal` | VPC con 2 subnets públicas, ALB público HTTP y cluster ECS |
+| `ecsFranquicias` | Roles IAM, log group, task definition y servicio Fargate detrás del ALB |
+
+### Primer despliegue
+
+**1. Bucket del state** (una sola vez; su state queda local en `iac/bootstrap/terraform.tfstate`, no lo borres):
+
+```bash
+cd iac/bootstrap
+terraform init
+terraform apply -var-file=env/dev/terraform-dev.tfvars
+```
+
+**2. Tabla y repositorio de imágenes:**
+
+```bash
+cd iac/franquiciasDynamo
+terraform init -backend-config=env/dev/backend-dev.hcl
+terraform apply -var-file=env/dev/terraform-dev.tfvars
+
+cd ../franquiciasEcr
+terraform init -backend-config=env/dev/backend-dev.hcl
+terraform apply -var-file=env/dev/terraform-dev.tfvars
+```
+
+**3. Construir y publicar la imagen.** El tag es el hash corto del commit:
+
+```bash
+TAG=$(git rev-parse --short HEAD)
+REPO=$(terraform -chdir=iac/franquiciasEcr output -raw repository_url)
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${REPO%%/*}
+docker build -f app/deployment/Dockerfile -t $REPO:$TAG app
+docker push $REPO:$TAG
+```
+
+> **Windows con Docker Desktop:** si `docker login` falla con `The stub received bad data`, es porque el token de ECR excede el tamaño que admite el almacén de credenciales de Windows. Se puede publicar con una configuración temporal de Docker:
+>
+> ```bash
+> export DOCKER_CONFIG=$(mktemp -d)
+> printf '{"auths":{"%s":{"auth":"%s"}}}' "${REPO%%/*}" "$(printf 'AWS:%s' "$(aws ecr get-login-password --region us-east-1)" | base64 -w0)" > "$DOCKER_CONFIG/config.json"
+> docker push $REPO:$TAG
+> rm -rf "$DOCKER_CONFIG"; unset DOCKER_CONFIG
+> ```
+
+**4. Red, balanceador y servicio:**
+
+```bash
+cd iac/transversal
+terraform init -backend-config=env/dev/backend-dev.hcl
+terraform apply -var-file=env/dev/terraform-dev.tfvars
+
+cd ../ecsFranquicias
+terraform init -backend-config=env/dev/backend-dev.hcl
+terraform apply -var-file=env/dev/terraform-dev.tfvars -var="image_tag=$TAG"
+```
+
+El `apply` del servicio espera a que la tarea esté sana (alrededor de un minuto). Al terminar muestra `api_url`.
+
+**5. Probar:**
+
+```bash
+API=$(terraform -chdir=iac/ecsFranquicias output -raw api_url)
+curl -X POST $API/franchises/create -H "Content-Type: application/json" -d '{"name": "Cafe Express"}'
+```
+
+### Publicar una nueva versión
+
+Repetir el paso 3 con el código nuevo (nuevo commit, nuevo tag) y luego:
+
+```bash
+terraform -chdir=iac/ecsFranquicias apply -var-file=env/dev/terraform-dev.tfvars -var="image_tag=$TAG"
+```
+
+ECS reemplaza la tarea sin cortar el servicio. Si la nueva versión no queda sana, vuelve sola a la anterior (*circuit breaker* con rollback).
+
+### Logs
+
+```bash
+aws logs tail /ecs/nequi-franquicias-dev --follow
+```
+
+En Git Bash, anteponer `MSYS_NO_PATHCONV=1` para que no convierta `/ecs/...` en una ruta de Windows.
+
+### Costos y limpieza
+
+Con todo desplegado el costo es de unos **USD 1,50 al día**, casi todo del ALB y de la tarea Fargate (DynamoDB, ECR y S3 cuestan centavos). Para no pagar mientras no se usa, se pueden destruir el servicio y la red y volver a aplicarlos después:
+
+```bash
+terraform -chdir=iac/ecsFranquicias destroy -var-file=env/dev/terraform-dev.tfvars -var="image_tag=$TAG"
+terraform -chdir=iac/transversal destroy -var-file=env/dev/terraform-dev.tfvars
+```
+
+Para eliminar todo, destruir en orden inverso: `ecsFranquicias` → `transversal` → `franquiciasEcr` → `franquiciasDynamo` → `bootstrap`.
+
 ## Pruebas y cobertura
 
 ```bash
