@@ -22,3 +22,8 @@ output "tasks_security_group_id" {
   description = "Security group assigned to the ECS tasks."
   value       = aws_security_group.tasks.id
 }
+
+output "ecs_cluster_name" {
+  description = "ECS cluster where the service runs."
+  value       = aws_ecs_cluster.this.name
+}

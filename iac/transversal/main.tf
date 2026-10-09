@@ -106,3 +106,26 @@ resource "aws_vpc_security_group_egress_rule" "tasks_all" {
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
 }
+
+################################################################################
+# ECS - Fargate cluster for the application service
+################################################################################
+
+resource "aws_ecs_cluster" "this" {
+  name = local.name
+
+  setting {
+    name  = "containerInsights"
+    value = "disabled"
+  }
+}
+
+resource "aws_ecs_cluster_capacity_providers" "this" {
+  cluster_name       = aws_ecs_cluster.this.name
+  capacity_providers = ["FARGATE"]
+
+  default_capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    weight            = 1
+  }
+}
