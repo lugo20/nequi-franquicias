@@ -98,7 +98,17 @@ DynamoDB Local acepta cualquier credencial; los valores `local` solo cumplen el 
 
 ## API
 
-Base: `http://localhost:8080/api/v1`
+Los ejemplos usan la variable `API` con la URL base, según dónde corra la aplicación:
+
+```bash
+# Local (docker compose o bootRun)
+API=http://localhost:8080/api/v1
+
+# AWS (la URL del ALB cambia si se recrea la infraestructura; se obtiene de Terraform)
+API=$(terraform -chdir=iac/ecsFranquicias output -raw api_url)
+```
+
+En PowerShell: `$API = "http://localhost:8080/api/v1"` o `$API = terraform -chdir=iac/ecsFranquicias output -raw api_url`.
 
 ### Convenciones
 
@@ -129,7 +139,7 @@ Responden con el status HTTP correspondiente y el cuerpo:
 `POST /franchises/create`
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/franchises/create -H "Content-Type: application/json" -d '{"name": "Cafe Express"}'
+curl -X POST $API/franchises/create -H "Content-Type: application/json" -d '{"name": "Cafe Express"}'
 ```
 
 Respuesta `201 Created`:
