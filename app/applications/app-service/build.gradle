@@ -1,0 +1,21 @@
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+	testImplementation 'com.fasterxml.jackson.core:jackson-databind'
+	testImplementation 'com.tngtech.archunit:archunit:1.4.0'
+    implementation project(':model')
+    implementation project(':usecase')
+    implementation project(':dynamo-db')
+    implementation project(':reactive-web')
+    implementation 'org.springframework.boot:spring-boot-starter'
+}
+
+jar {
+    // To disable the *-plain.jar
+    enabled = false
+}
+
+bootJar {
+    // Sets output jar name
+    archiveFileName = "${project.getParent().getName()}.${archiveExtension.get()}"
+}
