@@ -47,3 +47,53 @@ resource "aws_iam_role_policy" "table_access" {
   role   = aws_iam_role.task.id
   policy = data.aws_iam_policy_document.table_access.json
 }
+
+################################################################################
+# Task definition - Application container and its logs
+################################################################################
+
+resource "aws_cloudwatch_log_group" "app" {
+  name              = "/ecs/${local.name}"
+  retention_in_days = var.log_retention_days
+}
+
+resource "aws_ecs_task_definition" "app" {
+  family                   = local.name
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.task_cpu
+  memory                   = var.task_memory
+  execution_role_arn       = aws_iam_role.execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "X86_64"
+  }
+
+  container_definitions = jsonencode([{
+    name      = var.project
+    image     = "${local.ecr.repository_url}:${var.image_tag}"
+    essential = true
+
+    portMappings = [{
+      containerPort = var.app_port
+      protocol      = "tcp"
+    }]
+
+    # No DYNAMODB_ENDPOINT: the SDK uses AWS, and the task role provides the credentials.
+    environment = [
+      { name = "AWS_REGION", value = var.region },
+      { name = "DYNAMODB_TABLE_NAME", value = local.dynamo.table_name },
+    ]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.app.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "app"
+      }
+    }
+  }])
+}
