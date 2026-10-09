@@ -78,6 +78,8 @@ Cada componente de `iac/` contiene `main.tf`, `inputs.tf`, `data.tf`, `locals.tf
 
 ## Ramas y commits
 
+El README se actualiza en la misma rama que introduce cada funcionalidad, para que la documentación nunca quede desactualizada.
+
 ### Fase A - Base y primer endpoint local
 
 1. `feature/estructura-base`
@@ -97,9 +99,11 @@ Cada componente de `iac/` contiene `main.tf`, `inputs.tf`, `data.tf`, `locals.tf
    - `feat(dynamo): implementa consulta de franquicia por PK`
    - `feat(dynamo): implementa actualización y eliminación de items`
    - `test(dynamo): agrega pruebas del adapter`
+   - `build: agrega reporte de cobertura unificado y umbral mínimo` (Jacoco, 80 % de líneas; falla el build si baja)
 4. `feature/entorno-local`
    - `build: agrega Dockerfile multi-stage`
    - `chore: agrega docker-compose con DynamoDB Local y creación de tabla`
+   - `docs: agrega ejecución local al README`
 5. `feature/manejo-errores`
    - `feat(api): agrega RouterRest base y manejador global de errores HTTP`
    - `test(api): agrega pruebas del manejador de errores`
@@ -107,6 +111,7 @@ Cada componente de `iac/` contiene `main.tf`, `inputs.tf`, `data.tf`, `locals.tf
    - `feat(usecase): agrega caso de uso crear franquicia`
    - `feat(api): expone POST /franchises`
    - `test(api): agrega pruebas del handler`
+   - `docs: documenta POST /franchises en el README`
 
 ### Fase B - Walking skeleton en AWS
 
@@ -125,12 +130,13 @@ Cada componente de `iac/` contiene `main.tf`, `inputs.tf`, `data.tf`, `locals.tf
     - `feat(iac): agrega rol IAM de la task con acceso a la tabla`
     - `feat(iac): agrega task definition y log group`
     - `feat(iac): agrega servicio ECS conectado al ALB`
+    - `docs: agrega guía de despliegue en AWS al README`
     - Validar `POST /franchises` vía URL del ALB.
     - **Destroy** de `ecsFranquicias` y `transversal` para no pagar ALB y Fargate mientras se desarrolla.
 
 ### Fase C - Resto de endpoints
 
-Cada rama: `feat(usecase)` con su test → `feat(api)` handler y ruta → `test(api)` handler.
+Cada rama: `feat(usecase)` con su test → `feat(api)` handler y ruta → `test(api)` handler → `docs` endpoint en el README.
 
 12. `feature/crear-sucursal`
 13. `feature/crear-producto`
@@ -144,9 +150,8 @@ Cada rama: `feat(usecase)` con su test → `feat(api)` handler y ruta → `test(
 ### Fase D - Cierre
 
 20. `feature/documentacion`
-    - `docs: agrega README con ejecución local`
-    - `docs: agrega guía de despliegue en AWS`
     - `docs: agrega colección de requests de ejemplo`
+    - `docs: revisión final del README`
     - **Re-apply** de `transversal` y `ecsFranquicias` y push de la imagen final.
 21. `release/1.0.0` → PR a `main` → tag `v1.0.0` → merge de vuelta a `develop`.
     - Al terminar la evaluación: **destroy** total en orden `ecsFranquicias` → `transversal` → `franquiciasEcr` → `franquiciasDynamo` → `bootstrap`.
@@ -165,4 +170,4 @@ Cada rama: `feat(usecase)` con su test → `feat(api)` handler y ruta → `test(
 - JDK 21
 - Docker Desktop
 - Terraform >= 1.10
-- AWS CLI v2 configurado (`aws configure`, región `us-east-1`)
+- AWS CLI v2 con sesión iniciada (`aws login`, región `us-east-1`)
