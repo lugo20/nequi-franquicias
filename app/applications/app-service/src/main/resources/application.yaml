@@ -14,3 +14,9 @@ management:
     health:
       probes:
         enabled: true
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  dynamodb:
+    endpoint: ${DYNAMODB_ENDPOINT:}
+    table-name: ${DYNAMODB_TABLE_NAME:franquicias}
