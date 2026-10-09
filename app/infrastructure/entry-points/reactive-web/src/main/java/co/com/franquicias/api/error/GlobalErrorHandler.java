@@ -56,7 +56,7 @@ public class GlobalErrorHandler implements WebExceptionHandler {
     static HttpStatus statusOf(TechnicalMessage message) {
         return switch (message) {
             case FRANCHISE_NOT_FOUND, BRANCH_NOT_FOUND, PRODUCT_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case BRANCH_NAME_DUPLICATED, PRODUCT_NAME_DUPLICATED -> HttpStatus.CONFLICT;
+            case FRANCHISE_NAME_DUPLICATED, BRANCH_NAME_DUPLICATED, PRODUCT_NAME_DUPLICATED -> HttpStatus.CONFLICT;
             case INVALID_NAME, INVALID_STOCK, INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
             case TECHNICAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

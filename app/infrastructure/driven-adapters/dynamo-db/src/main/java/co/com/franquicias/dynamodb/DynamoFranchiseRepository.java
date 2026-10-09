@@ -1,6 +1,8 @@
 package co.com.franquicias.dynamodb;
 
 import co.com.franquicias.dynamodb.entity.FranchiseItem;
+import co.com.franquicias.model.enums.TechnicalMessage;
+import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.exceptions.TechnicalException;
 import co.com.franquicias.model.franchise.Branch;
 import co.com.franquicias.model.franchise.Franchise;
@@ -11,17 +13,25 @@ import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
+import software.amazon.awssdk.enhanced.dynamodb.Expression;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.TransactPutItemEnhancedRequest;
+import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.BRANCH;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.FRANCHISE;
+import static co.com.franquicias.dynamodb.entity.FranchiseItem.FRANCHISE_NAME;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.PRODUCT;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.branchSk;
+import static co.com.franquicias.dynamodb.entity.FranchiseItem.franchiseNamePk;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.franchisePk;
 import static co.com.franquicias.dynamodb.entity.FranchiseItem.productSk;
 import static java.util.stream.Collectors.groupingBy;
@@ -32,7 +42,11 @@ import static java.util.stream.Collectors.toList;
 @RequiredArgsConstructor
 public class DynamoFranchiseRepository implements FranchiseRepository {
 
+    private static final Expression NOT_EXISTS = Expression.builder().expression("attribute_not_exists(pk)").build();
+    private static final String CONDITION_FAILED = "ConditionalCheckFailed";
+
     private final DynamoDbAsyncTable<FranchiseItem> table;
+    private final DynamoDbEnhancedAsyncClient client;
 
     @Override
     public Mono<Franchise> findById(String franchiseId) {
@@ -44,15 +58,32 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
                 .flatMap(items -> Mono.justOrEmpty(toFranchise(items)));
     }
 
+    /** Writes the franchise and reserves its name atomically; fails if the name is already taken. */
     @Override
     public Mono<Franchise> saveFranchise(Franchise franchise) {
-        return put(FranchiseItem.builder()
+        FranchiseItem franchiseItem = FranchiseItem.builder()
                 .pk(franchisePk(franchise.id()))
                 .sk(FRANCHISE)
                 .type(FRANCHISE)
                 .id(franchise.id())
                 .name(franchise.name())
-                .build())
+                .build();
+        FranchiseItem nameReservation = FranchiseItem.builder()
+                .pk(franchiseNamePk(franchise.name()))
+                .sk(FRANCHISE_NAME)
+                .type(FRANCHISE_NAME)
+                .id(franchise.id())
+                .name(franchise.name())
+                .build();
+        TransactWriteItemsEnhancedRequest request = TransactWriteItemsEnhancedRequest.builder()
+                .addPutItem(table, franchiseItem)
+                .addPutItem(table, TransactPutItemEnhancedRequest.builder(FranchiseItem.class)
+                        .item(nameReservation)
+                        .conditionExpression(NOT_EXISTS)
+                        .build())
+                .build();
+        return Mono.fromFuture(() -> client.transactWriteItems(request))
+                .onErrorMap(DynamoFranchiseRepository::toNameError)
                 .thenReturn(franchise);
     }
 
@@ -96,6 +127,15 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
     private Mono<Void> put(FranchiseItem item) {
         return Mono.fromFuture(() -> table.putItem(item))
                 .onErrorMap(TechnicalException::new);
+    }
+
+    private static Throwable toNameError(Throwable error) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        boolean nameTaken = cause instanceof TransactionCanceledException canceled
+                && canceled.cancellationReasons().stream().anyMatch(reason -> CONDITION_FAILED.equals(reason.code()));
+        return nameTaken
+                ? new BusinessException(TechnicalMessage.FRANCHISE_NAME_DUPLICATED)
+                : new TechnicalException(error);
     }
 
     private static Optional<Franchise> toFranchise(List<FranchiseItem> items) {

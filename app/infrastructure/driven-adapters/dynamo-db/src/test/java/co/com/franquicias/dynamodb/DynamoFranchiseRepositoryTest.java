@@ -2,6 +2,7 @@ package co.com.franquicias.dynamodb;
 
 import co.com.franquicias.dynamodb.entity.FranchiseItem;
 import co.com.franquicias.model.enums.TechnicalMessage;
+import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.exceptions.TechnicalException;
 import co.com.franquicias.model.franchise.Branch;
 import co.com.franquicias.model.franchise.Franchise;
@@ -16,13 +17,20 @@ import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 import software.amazon.awssdk.core.async.SdkPublisher;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.enhanced.dynamodb.model.PagePublisher;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.CancellationReason;
+import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -35,27 +43,65 @@ class DynamoFranchiseRepositoryTest {
 
     @Mock
     private DynamoDbAsyncTable<FranchiseItem> table;
+    @Mock
+    private DynamoDbEnhancedAsyncClient client;
 
     private DynamoFranchiseRepository repository;
 
     @BeforeEach
     void setUp() {
-        repository = new DynamoFranchiseRepository(table);
+        repository = new DynamoFranchiseRepository(table, client);
     }
 
     @Test
-    void saveFranchiseWritesFranchiseItem() {
-        when(table.putItem(any(FranchiseItem.class))).thenReturn(CompletableFuture.completedFuture(null));
-        Franchise franchise = new Franchise("f1", "Franquicia", null);
+    void saveFranchiseWritesFranchiseAndReservesNameInOneTransaction() {
+        givenTableMetadata();
+        when(client.transactWriteItems(any(TransactWriteItemsEnhancedRequest.class)))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        Franchise franchise = new Franchise("f1", "Cafe Express", null);
 
         StepVerifier.create(repository.saveFranchise(franchise))
                 .expectNext(franchise)
                 .verifyComplete();
 
-        FranchiseItem item = capturePut();
-        assertEquals("FRANCHISE#f1", item.getPk());
-        assertEquals("FRANCHISE", item.getSk());
-        assertEquals("Franquicia", item.getName());
+        ArgumentCaptor<TransactWriteItemsEnhancedRequest> captor =
+                ArgumentCaptor.forClass(TransactWriteItemsEnhancedRequest.class);
+        verify(client).transactWriteItems(captor.capture());
+        List<Put> puts = captor.getValue().transactWriteItems().stream().map(item -> item.put()).toList();
+        assertEquals(2, puts.size());
+        assertEquals("FRANCHISE#f1", puts.get(0).item().get("pk").s());
+        assertEquals("FRANCHISE", puts.get(0).item().get("sk").s());
+        assertNull(puts.get(0).conditionExpression());
+        assertEquals("FRANCHISE_NAME#cafe express", puts.get(1).item().get("pk").s());
+        assertEquals("f1", puts.get(1).item().get("id").s());
+        assertEquals("attribute_not_exists(pk)", puts.get(1).conditionExpression());
+    }
+
+    @Test
+    void saveFranchiseFailsWithDuplicatedNameWhenReservationExists() {
+        givenTableMetadata();
+        TransactionCanceledException canceled = TransactionCanceledException.builder()
+                .cancellationReasons(CancellationReason.builder().code("None").build(),
+                        CancellationReason.builder().code("ConditionalCheckFailed").build())
+                .build();
+        when(client.transactWriteItems(any(TransactWriteItemsEnhancedRequest.class)))
+                .thenReturn(CompletableFuture.failedFuture(new CompletionException(canceled)));
+
+        StepVerifier.create(repository.saveFranchise(new Franchise("f2", "cafe express", null)))
+                .expectErrorSatisfies(error -> assertEquals(TechnicalMessage.FRANCHISE_NAME_DUPLICATED,
+                        ((BusinessException) error).getTechnicalMessage()))
+                .verify();
+    }
+
+    @Test
+    void saveFranchiseMapsOtherErrorsToTechnicalException() {
+        givenTableMetadata();
+        when(client.transactWriteItems(any(TransactWriteItemsEnhancedRequest.class)))
+                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("dynamo down")));
+
+        StepVerifier.create(repository.saveFranchise(new Franchise("f1", "Cafe", null)))
+                .expectError(TechnicalException.class)
+                .verify();
     }
 
     @Test
@@ -95,7 +141,7 @@ class DynamoFranchiseRepositoryTest {
         when(table.putItem(any(FranchiseItem.class)))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("dynamo down")));
 
-        StepVerifier.create(repository.saveFranchise(new Franchise("f1", "Franquicia", null)))
+        StepVerifier.create(repository.saveBranch("f1", new Branch("b1", "Sucursal", null)))
                 .expectErrorSatisfies(error -> {
                     assertEquals(TechnicalException.class, error.getClass());
                     assertEquals(TechnicalMessage.TECHNICAL_ERROR, ((TechnicalException) error).getTechnicalMessage());
@@ -151,6 +197,11 @@ class DynamoFranchiseRepositoryTest {
         verify(table).deleteItem(key.capture());
         assertEquals("FRANCHISE#f1", key.getValue().partitionKeyValue().s());
         assertEquals("BRANCH#b1#PRODUCT#p1", key.getValue().sortKeyValue().orElseThrow().s());
+    }
+
+    private void givenTableMetadata() {
+        when(table.tableName()).thenReturn("franquicias");
+        when(table.tableSchema()).thenReturn(TableSchema.fromBean(FranchiseItem.class));
     }
 
     private FranchiseItem capturePut() {
