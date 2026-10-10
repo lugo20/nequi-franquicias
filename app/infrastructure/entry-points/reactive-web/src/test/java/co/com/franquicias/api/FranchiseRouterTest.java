@@ -5,6 +5,9 @@ import co.com.franquicias.model.enums.TechnicalMessage;
 import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.franchise.Franchise;
 import co.com.franquicias.usecase.createfranchise.CreateFranchiseUseCase;
+import co.com.franquicias.usecase.gettopstockproducts.GetTopStockProductsUseCase;
+import co.com.franquicias.model.franchise.TopStockProduct;
+import reactor.core.publisher.Flux;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -22,12 +25,14 @@ import static org.mockito.Mockito.when;
 class FranchiseRouterTest {
 
     private CreateFranchiseUseCase createFranchiseUseCase;
+    private GetTopStockProductsUseCase getTopStockProductsUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         createFranchiseUseCase = mock(CreateFranchiseUseCase.class);
-        FranchiseHandler handler = new FranchiseHandler(createFranchiseUseCase);
+        getTopStockProductsUseCase = mock(GetTopStockProductsUseCase.class);
+        FranchiseHandler handler = new FranchiseHandler(createFranchiseUseCase, getTopStockProductsUseCase);
         client = RouterTestSupport.client(new RouterRest().franchiseRoutes(handler));
     }
 
@@ -68,6 +73,44 @@ class FranchiseRouterTest {
                 .exchange()
                 .expectStatus().isBadRequest()
                 .expectBody().jsonPath("$.code").isEqualTo("INVALID_REQUEST");
+    }
+
+    @Test
+    void getTopStockReturns200WithOneProductPerBranch() {
+        when(getTopStockProductsUseCase.execute("f1")).thenReturn(Flux.just(
+                new TopStockProduct("b1", "Norte", "p1", "Cafe", 10),
+                new TopStockProduct("b2", "Sur", "p3", "Pastel", 7)));
+
+        client.get().uri("/api/v1/franchises/f1/get-top-stock")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(2)
+                .jsonPath("$[0].branchName").isEqualTo("Norte")
+                .jsonPath("$[0].productName").isEqualTo("Cafe")
+                .jsonPath("$[0].stock").isEqualTo(10)
+                .jsonPath("$[1].branchId").isEqualTo("b2");
+    }
+
+    @Test
+    void getTopStockReturnsEmptyListWhenThereAreNoProducts() {
+        when(getTopStockProductsUseCase.execute("f1")).thenReturn(Flux.empty());
+
+        client.get().uri("/api/v1/franchises/f1/get-top-stock")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().json("[]");
+    }
+
+    @Test
+    void getTopStockReturns404WhenFranchiseDoesNotExist() {
+        when(getTopStockProductsUseCase.execute("f9"))
+                .thenReturn(Flux.error(new BusinessException(TechnicalMessage.FRANCHISE_NOT_FOUND)));
+
+        client.get().uri("/api/v1/franchises/f9/get-top-stock")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody().jsonPath("$.code").isEqualTo("FRANCHISE_NOT_FOUND");
     }
 
     private WebTestClient.ResponseSpec post(String body) {
