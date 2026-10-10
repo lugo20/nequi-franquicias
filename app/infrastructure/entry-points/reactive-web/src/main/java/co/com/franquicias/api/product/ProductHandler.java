@@ -2,10 +2,13 @@ package co.com.franquicias.api.product;
 
 import co.com.franquicias.api.dto.CreateProductRequest;
 import co.com.franquicias.api.dto.IdResponse;
+import co.com.franquicias.api.dto.ProductResponse;
+import co.com.franquicias.api.dto.UpdateStockRequest;
 import co.com.franquicias.model.enums.TechnicalMessage;
 import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.usecase.createproduct.CreateProductUseCase;
 import co.com.franquicias.usecase.deleteproduct.DeleteProductUseCase;
+import co.com.franquicias.usecase.updateproductstock.UpdateProductStockUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -19,6 +22,7 @@ public class ProductHandler {
 
     private final CreateProductUseCase createProductUseCase;
     private final DeleteProductUseCase deleteProductUseCase;
+    private final UpdateProductStockUseCase updateProductStockUseCase;
 
     public Mono<ServerResponse> createProduct(ServerRequest request) {
         return request.bodyToMono(CreateProductRequest.class)
@@ -32,5 +36,13 @@ public class ProductHandler {
         return deleteProductUseCase.execute(request.pathVariable("franchiseId"), request.pathVariable("branchId"),
                         request.pathVariable("productId"))
                 .then(ServerResponse.noContent().build());
+    }
+
+    public Mono<ServerResponse> updateStock(ServerRequest request) {
+        return request.bodyToMono(UpdateStockRequest.class)
+                .switchIfEmpty(Mono.error(new BusinessException(TechnicalMessage.INVALID_REQUEST)))
+                .flatMap(body -> updateProductStockUseCase.execute(body.franchiseId(), body.branchId(),
+                        body.productId(), body.stock()))
+                .flatMap(product -> ServerResponse.ok().bodyValue(ProductResponse.of(product)));
     }
 }

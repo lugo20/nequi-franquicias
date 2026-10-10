@@ -203,6 +203,22 @@ Respuesta `204 No Content`, sin cuerpo.
 
 Errores: `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `404 PRODUCT_NOT_FOUND` (también si el producto no pertenece a esa sucursal).
 
+### Modificar stock de un producto
+
+`POST /products/update-stock`
+
+```bash
+curl -X POST $API/products/update-stock -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "branchId": "<branchId>", "productId": "<productId>", "stock": 20}'
+```
+
+Respuesta `200 OK` con el producto actualizado:
+
+```json
+{ "id": "cbb09d6b-09de-4fa0-80fa-0d2356dc5f47", "name": "Te", "stock": 20 }
+```
+
+El stock se reemplaza por el valor enviado, así que repetir la petición deja el mismo resultado. Errores: `400 INVALID_REQUEST`, `400 INVALID_STOCK`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `404 PRODUCT_NOT_FOUND`.
+
 ## Modelo de datos
 
 Todo se guarda en **una sola tabla de DynamoDB** (diseño *single-table*). Cada franquicia forma un **grupo**: la franquicia, sus sucursales y sus productos comparten la misma clave de partición, así que una sola consulta trae la franquicia completa.
