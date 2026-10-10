@@ -1,31 +1,64 @@
 # nequi-franquicias
 
-API reactiva en Spring Boot para gestionar franquicias, sus sucursales y los productos de cada sucursal, con persistencia en DynamoDB y despliegue en AWS (ECS Fargate) aprovisionado con Terraform.
+API reactiva en Spring Boot para gestionar franquicias, sus sucursales y los productos de cada sucursal, con persistencia en DynamoDB y despliegue en AWS (API Gateway, ECS Fargate) aprovisionado con Terraform.
 
-> Proyecto en construcción: este README se actualiza a medida que se agregan funcionalidades.
+**API en AWS:** `https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1` · **Colección de Postman:** [`docs/postman`](docs/postman/nequi-franquicias.postman_collection.json)
 
-Ver el [plan de trabajo](PLAN.md) para las decisiones de arquitectura, endpoints y orden de implementación.
+El [plan de trabajo](PLAN.md) documenta las decisiones, el orden de implementación y las ramas.
+
+## Cumplimiento de la prueba
+
+| Requisito | Cómo se cumple |
+|---|---|
+| Proyecto en Spring Boot | Spring Boot 3.5 con WebFlux, Java 21 |
+| Agregar franquicia | `POST /franchises/create` |
+| Agregar sucursal a una franquicia | `POST /branches/create` |
+| Agregar producto a una sucursal | `POST /products/create` |
+| Eliminar producto de una sucursal | `DELETE /products/{franchiseId}/{branchId}/{productId}/delete` |
+| Modificar stock de un producto | `POST /products/update-stock` |
+| Producto con más stock por sucursal de una franquicia, indicando la sucursal | `GET /franchises/{franchiseId}/get-top-stock` |
+| Persistencia en un proveedor de nube | DynamoDB en AWS |
+| *Extra:* empaquetado con Docker | Dockerfile multi-stage y docker-compose para ejecución local |
+| *Extra:* programación funcional y reactiva | WebFlux y Reactor de punta a punta (sin bloqueos), entidades inmutables (records) |
+| *Extra:* renombrar franquicia, sucursal y producto | `POST /franchises/update-name`, `/branches/update-name` y `/products/update-name` |
+| *Extra:* persistencia aprovisionada con IaC | Terraform (tabla DynamoDB y el resto de la infraestructura) |
+| *Extra:* toda la solución desplegada en la nube | AWS: API Gateway → VPC Link → ALB interno → ECS Fargate → DynamoDB |
+| Repositorio público con flujo git | GitHub con git flow: ramas `feature/*`, PRs a `develop` y releases a `main` |
+| Documentación para desplegar desde un entorno local | Secciones [Ejecución local](#ejecución-local) y [Despliegue en AWS](#despliegue-en-aws) |
 
 ## Tecnologías
 
-- Java 21, Spring Boot 3.5 con WebFlux (reactivo)
-- Clean Architecture (plugin `co.com.bancolombia.cleanArchitecture`)
-- DynamoDB (AWS SDK v2 asíncrono), diseño single-table
-- Gradle 8.14 (wrapper incluido)
-- Docker y Docker Compose
+- **Aplicación:** Java 21, Spring Boot 3.5 con WebFlux (reactivo), Lombok
+- **Arquitectura:** Clean Architecture (plugin público `co.com.bancolombia.cleanArchitecture`)
+- **Persistencia:** DynamoDB con el AWS SDK v2 asíncrono, diseño *single-table*
+- **Pruebas:** JUnit 5, Mockito, Reactor `StepVerifier`, `WebTestClient` y Jacoco
+- **Build:** Gradle 8.14 (wrapper incluido)
+- **Contenedores:** Docker y Docker Compose
+- **Nube:** AWS (API Gateway, VPC, ALB, ECS Fargate, ECR, DynamoDB, S3, CloudWatch) con Terraform
 
 ## Estructura
 
 ```
-app/                                        Microservicio
-├── applications/app-service/               Arranque y configuración de Spring
-├── domain/model/                           Entidades, gateways y errores
-├── domain/usecase/                         Casos de uso
+app/                                            Microservicio (Clean Architecture)
+├── applications/app-service/                   Arranque y configuración de Spring
+├── domain/model/                               Entidades, gateway y catálogo de errores
+├── domain/usecase/                             Casos de uso (reglas de negocio)
 ├── infrastructure/driven-adapters/dynamo-db/   Persistencia en DynamoDB
-├── infrastructure/entry-points/reactive-web/   API REST
+├── infrastructure/entry-points/reactive-web/   API (rutas, handlers y manejo de errores)
 └── deployment/Dockerfile
-docker-compose.yml                          Entorno local completo
+iac/                                            Infraestructura en Terraform (un componente por carpeta)
+├── bootstrap/                                  Bucket S3 del state
+├── franquiciasDynamo/                          Tabla DynamoDB
+├── franquiciasEcr/                             Repositorio de imágenes
+├── franquiciasApiGateway/                      API Gateway (URL fija)
+├── transversal/                                Red, ALB interno, VPC Link y cluster ECS
+└── ecsFranquicias/                             Servicio ECS Fargate
+docs/postman/                                   Colección de Postman
+docker-compose.yml                              Entorno local completo
+PLAN.md                                         Plan de trabajo
 ```
+
+El dominio (`model` y `usecase`) no depende de Spring ni de AWS: los casos de uso son clases Java puras que trabajan contra el gateway `FranchiseRepository`, y el adapter de DynamoDB lo implementa. La tarea `validateStructure` del plugin verifica en cada build que las capas no se mezclen.
 
 ## Ejecución local
 
@@ -128,6 +161,35 @@ Si se despliega en otra cuenta de AWS, la URL será distinta: se obtiene con `te
 - Los nombres se guardan sin espacios al inicio ni al final; un nombre vacío o solo con espacios es inválido.
 - El nombre de una franquicia es único en todo el sistema, sin distinguir mayúsculas: `Cafe Express` y `cafe express` son el mismo. Los nombres de sucursal son únicos dentro de su franquicia, y los de producto dentro de su sucursal.
 
+### Endpoints
+
+| Método | Ruta | Body | Respuesta |
+|---|---|---|---|
+| POST | `/franchises/create` | `name` | `201` `{id}` |
+| POST | `/franchises/update-name` | `franchiseId`, `name` | `200` `{id, name}` |
+| GET | `/franchises/{franchiseId}/get-top-stock` | — | `200` lista |
+| POST | `/branches/create` | `franchiseId`, `name` | `201` `{id}` |
+| POST | `/branches/update-name` | `franchiseId`, `branchId`, `name` | `200` `{id, name}` |
+| POST | `/products/create` | `franchiseId`, `branchId`, `name`, `stock` | `201` `{id}` |
+| POST | `/products/update-stock` | `franchiseId`, `branchId`, `productId`, `stock` | `200` `{id, name, stock}` |
+| POST | `/products/update-name` | `franchiseId`, `branchId`, `productId`, `name` | `200` `{id, name, stock}` |
+| DELETE | `/products/{franchiseId}/{branchId}/{productId}/delete` | — | `204` |
+
+### Colección de Postman
+
+[`docs/postman/nequi-franquicias.postman_collection.json`](docs/postman/nequi-franquicias.postman_collection.json) contiene los 9 endpoints y los casos de error, con pruebas automáticas:
+
+1. Importarla en Postman (*Import* → seleccionar el archivo).
+2. La variable `baseUrl` apunta a AWS. Para local, cambiarla a `http://localhost:8080/api/v1`.
+3. Ejecutar la carpeta **1. Flujo completo** en orden (o *Run collection*): cada `create` guarda su id en una variable, así que no hay que copiar ids a mano. La carpeta **2. Errores** reutiliza esos ids.
+
+También se puede ejecutar desde la terminal con [newman](https://www.npmjs.com/package/newman):
+
+```bash
+npx newman run docs/postman/nequi-franquicias.postman_collection.json
+npx newman run docs/postman/nequi-franquicias.postman_collection.json --env-var baseUrl=http://localhost:8080/api/v1
+```
+
 ### Errores
 
 Responden con el status HTTP correspondiente y el cuerpo:
@@ -138,7 +200,7 @@ Responden con el status HTTP correspondiente y el cuerpo:
 
 | Status | Códigos |
 |---|---|
-| 400 | `INVALID_NAME`, `INVALID_STOCK`, `INVALID_REQUEST` (JSON mal formado o sin cuerpo) |
+| 400 | `INVALID_NAME` (nombre vacío), `INVALID_STOCK` (stock ausente o negativo), `INVALID_REQUEST` (cuerpo vacío o mal formado, ids faltantes o stock no entero) |
 | 404 | `FRANCHISE_NOT_FOUND`, `BRANCH_NOT_FOUND`, `PRODUCT_NOT_FOUND` |
 | 409 | `FRANCHISE_NAME_DUPLICATED`, `BRANCH_NAME_DUPLICATED`, `PRODUCT_NAME_DUPLICATED` |
 | 500 | `TECHNICAL_ERROR` |
@@ -245,6 +307,22 @@ Respuesta `201 Created`:
 
 El `stock` debe ser un entero mayor o igual a 0. Errores: `400 INVALID_REQUEST` (sin ids, JSON inválido o stock no entero), `400 INVALID_NAME`, `400 INVALID_STOCK`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND` (también si la sucursal no pertenece a esa franquicia), `409 PRODUCT_NAME_DUPLICATED`.
 
+### Modificar stock de un producto
+
+`POST /products/update-stock`
+
+```bash
+curl -X POST $API/products/update-stock -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "branchId": "<branchId>", "productId": "<productId>", "stock": 20}'
+```
+
+Respuesta `200 OK` con el producto actualizado:
+
+```json
+{ "id": "cbb09d6b-09de-4fa0-80fa-0d2356dc5f47", "name": "Te", "stock": 20 }
+```
+
+El stock se reemplaza por el valor enviado, así que repetir la petición deja el mismo resultado. Errores: `400 INVALID_REQUEST`, `400 INVALID_STOCK`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `404 PRODUCT_NOT_FOUND`.
+
 ### Renombrar producto
 
 `POST /products/update-name`
@@ -272,22 +350,6 @@ curl -X DELETE $API/products/<franchiseId>/<branchId>/<productId>/delete
 Respuesta `204 No Content`, sin cuerpo.
 
 Errores: `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `404 PRODUCT_NOT_FOUND` (también si el producto no pertenece a esa sucursal).
-
-### Modificar stock de un producto
-
-`POST /products/update-stock`
-
-```bash
-curl -X POST $API/products/update-stock -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "branchId": "<branchId>", "productId": "<productId>", "stock": 20}'
-```
-
-Respuesta `200 OK` con el producto actualizado:
-
-```json
-{ "id": "cbb09d6b-09de-4fa0-80fa-0d2356dc5f47", "name": "Te", "stock": 20 }
-```
-
-El stock se reemplaza por el valor enviado, así que repetir la petición deja el mismo resultado. Errores: `400 INVALID_REQUEST`, `400 INVALID_STOCK`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `404 PRODUCT_NOT_FOUND`.
 
 ## Modelo de datos
 
@@ -485,4 +547,22 @@ cd app
 
 Ejecuta las pruebas unitarias, genera el reporte de cobertura unificado y falla si la cobertura de líneas es menor al 80 %.
 
+| Capa | Qué se prueba | Herramientas |
+|---|---|---|
+| Dominio | Entidades inmutables | JUnit 5 |
+| Casos de uso | Reglas de negocio: validaciones, duplicados, recursos inexistentes, top de stock y empates | JUnit 5, Mockito, `StepVerifier` |
+| Adapter DynamoDB | Claves de cada ítem, transacciones de nombre único y renombre, armado del agregado y errores del SDK | JUnit 5, Mockito |
+| API | Status, cuerpo y códigos de error de cada endpoint, con el manejador de errores real | `WebTestClient` |
+
 Reporte HTML: `app/build/reports/jacocoMergedReport/html/index.html`
+
+## Limitaciones conocidas
+
+Decisiones tomadas a propósito para el alcance de la prueba:
+
+- **Sin autenticación:** la API es pública. En producción se agregaría un autorizador en API Gateway (por ejemplo, JWT o API keys).
+- **Sin endpoints de listado o búsqueda:** el consumidor guarda los ids que devuelve cada `create`.
+- **Unicidad de nombres de sucursales y productos:** se valida leyendo antes de escribir, así que dos peticiones simultáneas con el mismo nombre podrían crear un duplicado. El nombre de la franquicia sí es estrictamente único (escritura condicional transaccional).
+- **Un solo ambiente (`dev`) y una sola tarea** de ECS, sin autoescalado.
+- **Despliegue manual** desde la máquina local (sin pipeline de CI/CD).
+- **API Gateway sin dominio propio:** la URL es la que asigna AWS.
