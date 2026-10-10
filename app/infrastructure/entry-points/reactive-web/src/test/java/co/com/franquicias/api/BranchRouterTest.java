@@ -5,6 +5,7 @@ import co.com.franquicias.model.enums.TechnicalMessage;
 import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.franchise.Branch;
 import co.com.franquicias.usecase.createbranch.CreateBranchUseCase;
+import co.com.franquicias.usecase.updatebranchname.UpdateBranchNameUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -20,12 +21,15 @@ import static org.mockito.Mockito.when;
 class BranchRouterTest {
 
     private CreateBranchUseCase createBranchUseCase;
+    private UpdateBranchNameUseCase updateBranchNameUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         createBranchUseCase = mock(CreateBranchUseCase.class);
-        client = RouterTestSupport.client(new RouterRest().branchRoutes(new BranchHandler(createBranchUseCase)));
+        updateBranchNameUseCase = mock(UpdateBranchNameUseCase.class);
+        client = RouterTestSupport.client(new RouterRest().branchRoutes(
+                new BranchHandler(createBranchUseCase, updateBranchNameUseCase)));
     }
 
     @Test
@@ -65,6 +69,35 @@ class BranchRouterTest {
                 .exchange()
                 .expectStatus().isBadRequest()
                 .expectBody().jsonPath("$.code").isEqualTo("INVALID_REQUEST");
+    }
+
+    @Test
+    void updateNameReturns200WithIdAndName() {
+        when(updateBranchNameUseCase.execute("f1", "b1", "Norte Plaza"))
+                .thenReturn(Mono.just(new Branch("b1", "Norte Plaza", List.of())));
+
+        client.post().uri("/api/v1/branches/update-name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"franchiseId\":\"f1\",\"branchId\":\"b1\",\"name\":\"Norte Plaza\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("b1")
+                .jsonPath("$.name").isEqualTo("Norte Plaza")
+                .jsonPath("$.length()").isEqualTo(2);
+    }
+
+    @Test
+    void updateNameReturns404WhenBranchDoesNotExist() {
+        when(updateBranchNameUseCase.execute(any(), any(), any()))
+                .thenReturn(Mono.error(new BusinessException(TechnicalMessage.BRANCH_NOT_FOUND)));
+
+        client.post().uri("/api/v1/branches/update-name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"franchiseId\":\"f1\",\"branchId\":\"b9\",\"name\":\"X\"}")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody().jsonPath("$.code").isEqualTo("BRANCH_NOT_FOUND");
     }
 
     private WebTestClient.ResponseSpec post(String body) {
