@@ -5,6 +5,7 @@ import co.com.franquicias.api.dto.IdResponse;
 import co.com.franquicias.model.enums.TechnicalMessage;
 import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.usecase.createproduct.CreateProductUseCase;
+import co.com.franquicias.usecase.deleteproduct.DeleteProductUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import reactor.core.publisher.Mono;
 public class ProductHandler {
 
     private final CreateProductUseCase createProductUseCase;
+    private final DeleteProductUseCase deleteProductUseCase;
 
     public Mono<ServerResponse> createProduct(ServerRequest request) {
         return request.bodyToMono(CreateProductRequest.class)
@@ -24,5 +26,11 @@ public class ProductHandler {
                 .flatMap(body -> createProductUseCase.execute(body.franchiseId(), body.branchId(), body.name(), body.stock()))
                 .flatMap(product -> ServerResponse.status(HttpStatus.CREATED)
                         .bodyValue(new IdResponse(product.id())));
+    }
+
+    public Mono<ServerResponse> deleteProduct(ServerRequest request) {
+        return deleteProductUseCase.execute(request.pathVariable("franchiseId"), request.pathVariable("branchId"),
+                        request.pathVariable("productId"))
+                .then(ServerResponse.noContent().build());
     }
 }

@@ -4,6 +4,7 @@ import co.com.franquicias.model.enums.TechnicalMessage;
 import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.franchise.Branch;
 import co.com.franquicias.model.franchise.Franchise;
+import co.com.franquicias.model.franchise.Product;
 import co.com.franquicias.model.franchise.gateways.FranchiseRepository;
 import reactor.core.publisher.Mono;
 
@@ -31,5 +32,13 @@ public final class FranchiseLookup {
                         .filter(branch -> branch.id().equals(branchId))
                         .findFirst())
                 .switchIfEmpty(Mono.error(new BusinessException(TechnicalMessage.BRANCH_NOT_FOUND)));
+    }
+
+    /** Emits the product of the branch, or PRODUCT_NOT_FOUND. */
+    public static Mono<Product> requireProduct(Branch branch, String productId) {
+        return Mono.justOrEmpty(branch.products().stream()
+                        .filter(product -> product.id().equals(productId))
+                        .findFirst())
+                .switchIfEmpty(Mono.error(new BusinessException(TechnicalMessage.PRODUCT_NOT_FOUND)));
     }
 }
