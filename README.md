@@ -159,6 +159,22 @@ Respuesta `201 Created`:
 
 Errores: `400 INVALID_NAME`, `400 INVALID_REQUEST`, `409 FRANCHISE_NAME_DUPLICATED`.
 
+### Crear sucursal
+
+`POST /branches/create`
+
+```bash
+curl -X POST $API/branches/create -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "name": "Norte"}'
+```
+
+Respuesta `201 Created`:
+
+```json
+{ "id": "f31d30f1-adad-4b9c-a127-a59af0407d44" }
+```
+
+Errores: `400 INVALID_REQUEST` (sin `franchiseId` o JSON inválido), `400 INVALID_NAME`, `404 FRANCHISE_NOT_FOUND`, `409 BRANCH_NAME_DUPLICATED`.
+
 ## Modelo de datos
 
 Todo se guarda en **una sola tabla de DynamoDB** (diseño *single-table*). Cada franquicia forma un **grupo**: la franquicia, sus sucursales y sus productos comparten la misma clave de partición, así que una sola consulta trae la franquicia completa.
