@@ -1,0 +1,906 @@
+{
+  "info": {
+    "name": "nequi-franquicias",
+    "description": "API de franquicias. Ejecutar en orden: la carpeta 1 crea los datos y guarda los ids en variables; la carpeta 2 usa esos ids para probar los errores.\n\nVariable baseUrl: URL de AWS por defecto; para local usar http://localhost:8080/api/v1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Flujo completo",
+      "item": [
+        {
+          "name": "1. Crear franquicia",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique suffix: franchise names are unique system-wide.",
+                  "pm.collectionVariables.set(\"suffix\", Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"franchiseId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/franchises/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "franchises",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cafe Express {{suffix}}\"\n}"
+            },
+            "description": "Crea la franquicia y guarda su id en la variable franchiseId."
+          }
+        },
+        {
+          "name": "2. Crear sucursal Norte",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"branchNorteId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"name\": \"Norte\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Crear sucursal Sur",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"branchSurId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"name\": \"Sur\"\n}"
+            }
+          }
+        },
+        {
+          "name": "4. Crear producto Cafe (Norte, 10)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"productCafeId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"name\": \"Cafe\",\n  \"stock\": 10\n}"
+            }
+          }
+        },
+        {
+          "name": "5. Crear producto Te (Norte, 3)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"productTeId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"name\": \"Te\",\n  \"stock\": 3\n}"
+            }
+          }
+        },
+        {
+          "name": "6. Crear producto Pastel (Sur, 7)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"productPastelId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchSurId}}\",\n  \"name\": \"Pastel\",\n  \"stock\": 7\n}"
+            }
+          }
+        },
+        {
+          "name": "7. Producto con más stock por sucursal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const top = pm.response.json();",
+                  "pm.test(\"Un producto por sucursal\", () => pm.expect(top.length).to.eql(2));",
+                  "pm.test(\"Norte -> Cafe (10)\", () => pm.expect([top[0].branchName, top[0].productName, top[0].stock]).to.eql([\"Norte\", \"Cafe\", 10]));",
+                  "pm.test(\"Sur -> Pastel (7)\", () => pm.expect([top[1].branchName, top[1].productName, top[1].stock]).to.eql([\"Sur\", \"Pastel\", 7]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/franchises/{{franchiseId}}/get-top-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "franchises",
+                "{{franchiseId}}",
+                "get-top-stock"
+              ]
+            }
+          }
+        },
+        {
+          "name": "8. Modificar stock de Te a 20",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Stock 20\", () => pm.expect(pm.response.json().stock).to.eql(20));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/update-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "update-stock"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"productId\": \"{{productTeId}}\",\n  \"stock\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "9. Renombrar producto Te a Te Verde",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nombre nuevo, mismo stock\", () => pm.expect([pm.response.json().name, pm.response.json().stock]).to.eql([\"Te Verde\", 20]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/update-name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "update-name"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"productId\": \"{{productTeId}}\",\n  \"name\": \"Te Verde\"\n}"
+            }
+          }
+        },
+        {
+          "name": "10. Renombrar sucursal Norte a Norte Plaza",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nombre nuevo\", () => pm.expect(pm.response.json().name).to.eql(\"Norte Plaza\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/update-name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "update-name"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"name\": \"Norte Plaza\"\n}"
+            }
+          }
+        },
+        {
+          "name": "11. Renombrar franquicia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nombre nuevo\", () => pm.expect(pm.response.json().name).to.eql(\"Cafe Premium \" + pm.collectionVariables.get(\"suffix\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/franchises/update-name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "franchises",
+                "update-name"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"name\": \"Cafe Premium {{suffix}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "12. Eliminar producto Pastel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{franchiseId}}/{{branchSurId}}/{{productPastelId}}/delete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{franchiseId}}",
+                "{{branchSurId}}",
+                "{{productPastelId}}",
+                "delete"
+              ]
+            }
+          }
+        },
+        {
+          "name": "13. Producto con más stock (final)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const top = pm.response.json();",
+                  "pm.test(\"Solo Norte Plaza: Sur quedó sin productos\", () => pm.expect(top.length).to.eql(1));",
+                  "pm.test(\"Norte Plaza -> Te Verde (20)\", () => pm.expect([top[0].branchName, top[0].productName, top[0].stock]).to.eql([\"Norte Plaza\", \"Te Verde\", 20]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/franchises/{{franchiseId}}/get-top-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "franchises",
+                "{{franchiseId}}",
+                "get-top-stock"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Errores",
+      "item": [
+        {
+          "name": "Franquicia con nombre repetido (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Code FRANCHISE_NAME_DUPLICATED\", () => pm.expect(pm.response.json().code).to.eql(\"FRANCHISE_NAME_DUPLICATED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/franchises/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "franchises",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"CAFE PREMIUM {{suffix}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Sucursal con nombre repetido (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Code BRANCH_NAME_DUPLICATED\", () => pm.expect(pm.response.json().code).to.eql(\"BRANCH_NAME_DUPLICATED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"name\": \"sur\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Producto con nombre repetido (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Code PRODUCT_NAME_DUPLICATED\", () => pm.expect(pm.response.json().code).to.eql(\"PRODUCT_NAME_DUPLICATED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"name\": \"cafe\",\n  \"stock\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Stock negativo (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Code INVALID_STOCK\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_STOCK\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/update-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "update-stock"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"productId\": \"{{productTeId}}\",\n  \"stock\": -1\n}"
+            }
+          }
+        },
+        {
+          "name": "Stock decimal (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Code INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"{{branchNorteId}}\",\n  \"name\": \"Jugo\",\n  \"stock\": 1.5\n}"
+            }
+          }
+        },
+        {
+          "name": "Nombre vacío (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Code INVALID_NAME\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_NAME\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/branches/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"name\": \"   \"\n}"
+            }
+          }
+        },
+        {
+          "name": "Sin ids en el body (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Code INVALID_REQUEST\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/update-name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "update-name"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jugo\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Franquicia inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Code FRANCHISE_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"FRANCHISE_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/franchises/no-existe/get-top-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "franchises",
+                "no-existe",
+                "get-top-stock"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sucursal inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Code BRANCH_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"BRANCH_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"franchiseId\": \"{{franchiseId}}\",\n  \"branchId\": \"no-existe\",\n  \"name\": \"Jugo\",\n  \"stock\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Producto ya eliminado (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Code PRODUCT_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"PRODUCT_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{franchiseId}}/{{branchSurId}}/{{productPastelId}}/delete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{franchiseId}}",
+                "{{branchSurId}}",
+                "{{productPastelId}}",
+                "delete"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1"
+    },
+    {
+      "key": "suffix",
+      "value": ""
+    },
+    {
+      "key": "franchiseId",
+      "value": ""
+    },
+    {
+      "key": "branchNorteId",
+      "value": ""
+    },
+    {
+      "key": "branchSurId",
+      "value": ""
+    },
+    {
+      "key": "productCafeId",
+      "value": ""
+    },
+    {
+      "key": "productTeId",
+      "value": ""
+    },
+    {
+      "key": "productPastelId",
+      "value": ""
+    }
+  ]
+}

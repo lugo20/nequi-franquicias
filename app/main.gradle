@@ -1,0 +1,108 @@
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'jacoco'
+    apply plugin: 'io.spring.dependency-management'
+
+    compileJava.dependsOn validateStructure
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+    }
+
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'ch.qos.logback'
+                    && (details.requested.name == 'logback-classic' || details.requested.name == 'logback-core')) {
+                details.useVersion "${logbackVersion}"
+            }
+        }
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        implementation 'io.projectreactor:reactor-core'
+        implementation 'io.projectreactor.addons:reactor-extra'
+
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+        testImplementation 'io.projectreactor:reactor-test'
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        compileOnly "org.projectlombok:lombok:${lombokVersion}"
+        annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+        testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        implementation platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+
+        if (!project.name.equalsIgnoreCase(modelModule) && !project.name.equalsIgnoreCase(useCaseModule)) {
+            implementation "ch.qos.logback:logback-classic:${logbackVersion}"
+            implementation "ch.qos.logback:logback-core:${logbackVersion}"
+            implementation "net.logstash.logback:logstash-logback-encoder:${logstashLogbackVersion}"
+        }
+    }
+
+    test.finalizedBy(project.tasks.jacocoTestReport)
+
+    jacocoTestReport {
+        dependsOn test
+        reports {
+            xml.required = true
+            csv.required = false
+            html.outputLocation = layout.buildDirectory.dir("reports/jacocoHtml")
+        }
+    }
+}
+
+jacoco {
+    toolVersion = "${jacocoVersion}"
+}
+
+// Bootstrap and wiring classes have no logic to test.
+def coverageExclusions = ['**/MainApplication.class', '**/config/**']
+
+def configureMergedCoverage = { task ->
+    task.dependsOn subprojects.test
+    task.executionData.setFrom files(subprojects.collect { it.layout.buildDirectory.file('jacoco/test.exec') })
+            .filter { it.exists() }
+    task.sourceDirectories.setFrom files(subprojects.sourceSets.main.allJava.srcDirs)
+    task.classDirectories.setFrom files(subprojects.sourceSets.main.output.classesDirs).asFileTree.matching {
+        exclude coverageExclusions
+    }
+}
+
+tasks.register('jacocoMergedReport', JacocoReport) {
+    configureMergedCoverage(it)
+    reports {
+        xml.required = true
+        html.outputLocation = layout.buildDirectory.dir('reports/jacocoMergedReport/html')
+    }
+}
+
+tasks.register('jacocoMergedCoverageVerification', JacocoCoverageVerification) {
+    configureMergedCoverage(it)
+    dependsOn jacocoMergedReport
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn jacocoMergedCoverageVerification
+}
+
+tasks.named('wrapper') {
+    gradleVersion = '8.14.3'
+    distributionSha256Sum = 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
+}
