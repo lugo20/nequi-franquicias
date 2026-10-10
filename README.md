@@ -103,7 +103,7 @@ DynamoDB Local acepta cualquier credencial; los valores `local` solo cumplen el 
 | **AWS** | **`https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1`** |
 | Local | `http://localhost:8080/api/v1` |
 
-La URL de AWS es fija (API Gateway). Si la infraestructura está apagada para ahorrar costos, responde `404 Not Found` hasta que se vuelva a desplegar.
+La URL de AWS es fija (API Gateway). Si la infraestructura está apagada para ahorrar costos, responde `500 Internal Server Error` hasta que se vuelva a desplegar.
 
 Los ejemplos usan la variable `API` con la URL base:
 
@@ -227,7 +227,7 @@ DynamoDB (nequi-franquicias-dev)    franquiciasDynamo
 ```
 
 - **Única entrada pública: API Gateway**, con HTTPS. El ALB es interno y solo acepta tráfico del VPC Link; las tareas solo aceptan tráfico del ALB.
-- **La URL es fija** (`https://<id>.execute-api.us-east-1.amazonaws.com`): la API vive en un componente que no se destruye. La ruta y la conexión al ALB se crean y destruyen junto con la red, así que al volver a encender la infraestructura la URL sigue siendo la misma. Mientras la red está apagada, la URL responde `404 Not Found`.
+- **La URL es fija** (`https://<id>.execute-api.us-east-1.amazonaws.com`): la API vive en un componente que no se destruye. La ruta y la conexión al ALB se crean y destruyen junto con la red, así que al volver a encender la infraestructura la URL sigue siendo la misma. Mientras la red está apagada, la URL responde `500 Internal Server Error`: API Gateway no puede desplegar una API sin rutas y conserva su último despliegue, que apunta al VPC Link eliminado. Al volver a aplicar `transversal` se recupera sola.
 - Las tareas usan IP pública solo para salir a internet (descargar la imagen, DynamoDB, CloudWatch): no hay NAT Gateway.
 
 ### Requisitos
