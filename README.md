@@ -98,17 +98,26 @@ DynamoDB Local acepta cualquier credencial; los valores `local` solo cumplen el 
 
 ## API
 
-Los ejemplos usan la variable `API` con la URL base, según dónde corra la aplicación:
+| Entorno | URL base |
+|---|---|
+| **AWS** | **`https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1`** |
+| Local | `http://localhost:8080/api/v1` |
+
+La URL de AWS es fija (API Gateway). Si la infraestructura está apagada para ahorrar costos, responde `404 Not Found` hasta que se vuelva a desplegar.
+
+Los ejemplos usan la variable `API` con la URL base:
 
 ```bash
+# AWS
+API=https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1
+
 # Local (docker compose o bootRun)
 API=http://localhost:8080/api/v1
-
-# AWS (URL fija de API Gateway, HTTPS)
-API=$(terraform -chdir=iac/ecsFranquicias output -raw api_url)
 ```
 
-En PowerShell: `$API = "http://localhost:8080/api/v1"` o `$API = terraform -chdir=iac/ecsFranquicias output -raw api_url`.
+En PowerShell: `$API = "https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1"`.
+
+Si se despliega en otra cuenta de AWS, la URL será distinta: se obtiene con `terraform -chdir=iac/ecsFranquicias output -raw api_url`.
 
 ### Convenciones
 
