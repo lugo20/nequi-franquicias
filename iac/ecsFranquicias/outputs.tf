@@ -1,6 +1,6 @@
 output "api_url" {
-  description = "Base URL of the API."
-  value       = "http://${local.transversal.alb_dns_name}/api/v1"
+  description = "Fixed public base URL of the API (API Gateway)."
+  value       = "${local.api_gateway.api_endpoint}/api/v1"
 }
 
 output "service_name" {

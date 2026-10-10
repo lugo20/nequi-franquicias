@@ -98,17 +98,26 @@ DynamoDB Local acepta cualquier credencial; los valores `local` solo cumplen el 
 
 ## API
 
-Los ejemplos usan la variable `API` con la URL base, según dónde corra la aplicación:
+| Entorno | URL base |
+|---|---|
+| **AWS** | **`https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1`** |
+| Local | `http://localhost:8080/api/v1` |
+
+La URL de AWS es fija (API Gateway). Si la infraestructura está apagada para ahorrar costos, responde `404 Not Found` hasta que se vuelva a desplegar.
+
+Los ejemplos usan la variable `API` con la URL base:
 
 ```bash
+# AWS
+API=https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1
+
 # Local (docker compose o bootRun)
 API=http://localhost:8080/api/v1
-
-# AWS (la URL del ALB cambia si se recrea la infraestructura; se obtiene de Terraform)
-API=$(terraform -chdir=iac/ecsFranquicias output -raw api_url)
 ```
 
-En PowerShell: `$API = "http://localhost:8080/api/v1"` o `$API = terraform -chdir=iac/ecsFranquicias output -raw api_url`.
+En PowerShell: `$API = "https://ebnrykpht7.execute-api.us-east-1.amazonaws.com/api/v1"`.
+
+Si se despliega en otra cuenta de AWS, la URL será distinta: se obtiene con `terraform -chdir=iac/ecsFranquicias output -raw api_url`.
 
 ### Convenciones
 
@@ -196,7 +205,30 @@ Franquicia *Cafe Express* con las sucursales *Norte* (productos *Cafe* y *Te*) y
 
 ## Despliegue en AWS
 
-La infraestructura se crea con Terraform en `us-east-1`: DynamoDB, ECR, VPC, ALB público y ECS Fargate. Todos los comandos se ejecutan desde la máquina local.
+La infraestructura se crea con Terraform en `us-east-1`. Todos los comandos se ejecutan desde la máquina local.
+
+### Arquitectura
+
+```
+Cliente
+   │  HTTPS (URL fija)
+   ▼
+API Gateway (HTTP API)              franquiciasApiGateway: nunca se destruye
+   │  ruta ANY /{proxy+}
+   ▼
+VPC Link (privado)                  ┐
+   ▼                                │ transversal
+ALB interno :80                     │ (sin acceso desde internet)
+   ▼                                ┘
+Tarea ECS Fargate :8080             ecsFranquicias
+   │  rol IAM de la tarea
+   ▼
+DynamoDB (nequi-franquicias-dev)    franquiciasDynamo
+```
+
+- **Única entrada pública: API Gateway**, con HTTPS. El ALB es interno y solo acepta tráfico del VPC Link; las tareas solo aceptan tráfico del ALB.
+- **La URL es fija** (`https://<id>.execute-api.us-east-1.amazonaws.com`): la API vive en un componente que no se destruye. La ruta y la conexión al ALB se crean y destruyen junto con la red, así que al volver a encender la infraestructura la URL sigue siendo la misma. Mientras la red está apagada, la URL responde `404 Not Found`.
+- Las tareas usan IP pública solo para salir a internet (descargar la imagen, DynamoDB, CloudWatch): no hay NAT Gateway.
 
 ### Requisitos
 
@@ -213,7 +245,8 @@ Cada carpeta de `iac/` es un componente independiente con su propio state. El st
 | `bootstrap` | Bucket S3 para el state de Terraform (versionado y cifrado) |
 | `franquiciasDynamo` | Tabla DynamoDB on-demand |
 | `franquiciasEcr` | Repositorio de imágenes (tags inmutables, escaneo, conserva las últimas 5) |
-| `transversal` | VPC con 2 subnets públicas, ALB público HTTP y cluster ECS |
+| `franquiciasApiGateway` | API Gateway HTTP con la URL pública fija (persistente) |
+| `transversal` | VPC con 2 subnets públicas, ALB interno, VPC Link, ruta de API Gateway y cluster ECS |
 | `ecsFranquicias` | Roles IAM, log group, task definition y servicio Fargate detrás del ALB |
 
 ### Primer despliegue
@@ -226,7 +259,7 @@ terraform init
 terraform apply -var-file=env/dev/terraform-dev.tfvars
 ```
 
-**2. Tabla y repositorio de imágenes:**
+**2. Tabla, repositorio de imágenes y API Gateway:**
 
 ```bash
 cd iac/franquiciasDynamo
@@ -234,6 +267,10 @@ terraform init -backend-config=env/dev/backend-dev.hcl
 terraform apply -var-file=env/dev/terraform-dev.tfvars
 
 cd ../franquiciasEcr
+terraform init -backend-config=env/dev/backend-dev.hcl
+terraform apply -var-file=env/dev/terraform-dev.tfvars
+
+cd ../franquiciasApiGateway
 terraform init -backend-config=env/dev/backend-dev.hcl
 terraform apply -var-file=env/dev/terraform-dev.tfvars
 ```
@@ -269,7 +306,7 @@ terraform init -backend-config=env/dev/backend-dev.hcl
 terraform apply -var-file=env/dev/terraform-dev.tfvars -var="image_tag=$TAG"
 ```
 
-El `apply` del servicio espera a que la tarea esté sana (alrededor de un minuto). Al terminar muestra `api_url`.
+El `apply` de `transversal` tarda unos 3 minutos (el VPC Link es lo más lento) y el del servicio espera a que la tarea esté sana (alrededor de un minuto). Al terminar muestra `api_url`. Si las primeras peticiones responden `503 Service Unavailable`, es la ruta de API Gateway terminando de propagarse: basta con esperar un minuto.
 
 **5. Probar:**
 
@@ -298,14 +335,14 @@ En Git Bash, anteponer `MSYS_NO_PATHCONV=1` para que no convierta `/ecs/...` en 
 
 ### Costos y limpieza
 
-Con todo desplegado el costo es de unos **USD 1,50 al día**, casi todo del ALB y de la tarea Fargate (DynamoDB, ECR y S3 cuestan centavos). Para no pagar mientras no se usa, se pueden destruir el servicio y la red y volver a aplicarlos después:
+Con todo desplegado el costo es de unos **USD 1,30 al día**, casi todo del ALB y de la tarea Fargate. API Gateway cobra solo por petición, y DynamoDB, ECR y S3 cuestan centavos. Para no pagar mientras no se usa, se pueden destruir el servicio y la red y volver a aplicarlos después; **la URL de la API no cambia**:
 
 ```bash
 terraform -chdir=iac/ecsFranquicias destroy -var-file=env/dev/terraform-dev.tfvars -var="image_tag=$TAG"
 terraform -chdir=iac/transversal destroy -var-file=env/dev/terraform-dev.tfvars
 ```
 
-Para eliminar todo, destruir en orden inverso: `ecsFranquicias` → `transversal` → `franquiciasEcr` → `franquiciasDynamo` → `bootstrap`.
+Para eliminar todo, destruir en orden inverso: `ecsFranquicias` → `transversal` → `franquiciasApiGateway` → `franquiciasEcr` → `franquiciasDynamo` → `bootstrap`.
 
 ## Pruebas y cobertura
 
