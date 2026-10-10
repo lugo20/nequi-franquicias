@@ -38,6 +38,7 @@ public class RouterRest {
     public RouterFunction<ServerResponse> productRoutes(ProductHandler productHandler) {
         return route()
                 .POST(PRODUCTS + CREATE, productHandler::createProduct)
+                .POST(PRODUCTS + "/update-stock", productHandler::updateStock)
                 .DELETE(PRODUCTS + PRODUCT_PATH + "/delete", productHandler::deleteProduct)
                 .build();
     }

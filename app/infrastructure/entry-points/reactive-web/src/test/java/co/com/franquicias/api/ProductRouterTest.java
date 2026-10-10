@@ -6,6 +6,7 @@ import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.franchise.Product;
 import co.com.franquicias.usecase.createproduct.CreateProductUseCase;
 import co.com.franquicias.usecase.deleteproduct.DeleteProductUseCase;
+import co.com.franquicias.usecase.updateproductstock.UpdateProductStockUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -22,14 +23,16 @@ class ProductRouterTest {
 
     private CreateProductUseCase createProductUseCase;
     private DeleteProductUseCase deleteProductUseCase;
+    private UpdateProductStockUseCase updateProductStockUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         createProductUseCase = mock(CreateProductUseCase.class);
         deleteProductUseCase = mock(DeleteProductUseCase.class);
+        updateProductStockUseCase = mock(UpdateProductStockUseCase.class);
         client = RouterTestSupport.client(new RouterRest().productRoutes(
-                new ProductHandler(createProductUseCase, deleteProductUseCase)));
+                new ProductHandler(createProductUseCase, deleteProductUseCase, updateProductStockUseCase)));
     }
 
     @Test
@@ -90,6 +93,28 @@ class ProductRouterTest {
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody().jsonPath("$.code").isEqualTo("PRODUCT_NOT_FOUND");
+    }
+
+    @Test
+    void updateStockReturns200WithUpdatedProduct() {
+        when(updateProductStockUseCase.execute("f1", "b1", "p2", 20)).thenReturn(Mono.just(new Product("p2", "Te", 20)));
+
+        post("/api/v1/products/update-stock", "{\"franchiseId\":\"f1\",\"branchId\":\"b1\",\"productId\":\"p2\",\"stock\":20}")
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("p2")
+                .jsonPath("$.name").isEqualTo("Te")
+                .jsonPath("$.stock").isEqualTo(20);
+    }
+
+    @Test
+    void updateStockReturns400WhenStockIsNegative() {
+        when(updateProductStockUseCase.execute(any(), any(), any(), any()))
+                .thenReturn(Mono.error(new BusinessException(TechnicalMessage.INVALID_STOCK)));
+
+        post("/api/v1/products/update-stock", "{\"franchiseId\":\"f1\",\"branchId\":\"b1\",\"productId\":\"p2\",\"stock\":-1}")
+                .expectStatus().isBadRequest()
+                .expectBody().jsonPath("$.code").isEqualTo("INVALID_STOCK");
     }
 
     private WebTestClient.ResponseSpec post(String uri, String body) {
