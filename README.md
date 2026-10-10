@@ -191,6 +191,18 @@ Respuesta `201 Created`:
 
 El `stock` debe ser un entero mayor o igual a 0. Errores: `400 INVALID_REQUEST` (sin ids, JSON inválido o stock no entero), `400 INVALID_NAME`, `400 INVALID_STOCK`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND` (también si la sucursal no pertenece a esa franquicia), `409 PRODUCT_NAME_DUPLICATED`.
 
+### Eliminar producto
+
+`DELETE /products/{franchiseId}/{branchId}/{productId}/delete`
+
+```bash
+curl -X DELETE $API/products/<franchiseId>/<branchId>/<productId>/delete
+```
+
+Respuesta `204 No Content`, sin cuerpo.
+
+Errores: `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `404 PRODUCT_NOT_FOUND` (también si el producto no pertenece a esa sucursal).
+
 ## Modelo de datos
 
 Todo se guarda en **una sola tabla de DynamoDB** (diseño *single-table*). Cada franquicia forma un **grupo**: la franquicia, sus sucursales y sus productos comparten la misma clave de partición, así que una sola consulta trae la franquicia completa.
