@@ -1,5 +1,6 @@
 package co.com.franquicias.api;
 
+import co.com.franquicias.api.branch.BranchHandler;
 import co.com.franquicias.api.franchise.FranchiseHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,16 +9,25 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
+/** One router per resource; Spring combines them. */
 @Configuration
 public class RouterRest {
 
     private static final String FRANCHISES = "/api/v1/franchises";
+    private static final String BRANCHES = "/api/v1/branches";
     private static final String CREATE = "/create";
 
     @Bean
-    public RouterFunction<ServerResponse> routerFunction(FranchiseHandler franchiseHandler) {
+    public RouterFunction<ServerResponse> franchiseRoutes(FranchiseHandler franchiseHandler) {
         return route()
                 .POST(FRANCHISES + CREATE, franchiseHandler::createFranchise)
+                .build();
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> branchRoutes(BranchHandler branchHandler) {
+        return route()
+                .POST(BRANCHES + CREATE, branchHandler::createBranch)
                 .build();
     }
 }
