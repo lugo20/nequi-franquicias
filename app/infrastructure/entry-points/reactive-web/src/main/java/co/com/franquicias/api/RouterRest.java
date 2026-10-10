@@ -24,6 +24,7 @@ public class RouterRest {
     public RouterFunction<ServerResponse> franchiseRoutes(FranchiseHandler franchiseHandler) {
         return route()
                 .POST(FRANCHISES + CREATE, franchiseHandler::createFranchise)
+                .GET(FRANCHISES + "/{franchiseId}/get-top-stock", franchiseHandler::getTopStock)
                 .build();
     }
 

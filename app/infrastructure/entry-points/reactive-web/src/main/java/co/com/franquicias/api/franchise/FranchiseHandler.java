@@ -5,6 +5,7 @@ import co.com.franquicias.api.dto.NameRequest;
 import co.com.franquicias.model.enums.TechnicalMessage;
 import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.usecase.createfranchise.CreateFranchiseUseCase;
+import co.com.franquicias.usecase.gettopstockproducts.GetTopStockProductsUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import reactor.core.publisher.Mono;
 public class FranchiseHandler {
 
     private final CreateFranchiseUseCase createFranchiseUseCase;
+    private final GetTopStockProductsUseCase getTopStockProductsUseCase;
 
     public Mono<ServerResponse> createFranchise(ServerRequest request) {
         return request.bodyToMono(NameRequest.class)
@@ -24,5 +26,12 @@ public class FranchiseHandler {
                 .flatMap(body -> createFranchiseUseCase.execute(body.name()))
                 .flatMap(franchise -> ServerResponse.status(HttpStatus.CREATED)
                         .bodyValue(new IdResponse(franchise.id())));
+    }
+
+    public Mono<ServerResponse> getTopStock(ServerRequest request) {
+        // collectList so a 404 is still possible before the response starts.
+        return getTopStockProductsUseCase.execute(request.pathVariable("franchiseId"))
+                .collectList()
+                .flatMap(products -> ServerResponse.ok().bodyValue(products));
     }
 }
