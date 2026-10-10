@@ -17,8 +17,10 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.TransactDeleteItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactPutItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 import java.util.List;
@@ -61,30 +63,43 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
     /** Writes the franchise and reserves its name atomically; fails if the name is already taken. */
     @Override
     public Mono<Franchise> saveFranchise(Franchise franchise) {
-        FranchiseItem franchiseItem = FranchiseItem.builder()
-                .franchiseKey(franchiseKey(franchise.id()))
-                .entityKey(FRANCHISE)
-                .type(FRANCHISE)
-                .id(franchise.id())
-                .name(franchise.name())
-                .build();
-        FranchiseItem nameReservation = FranchiseItem.builder()
-                .franchiseKey(franchiseNameKey(franchise.name()))
-                .entityKey(FRANCHISE_NAME)
-                .type(FRANCHISE_NAME)
-                .id(franchise.id())
-                .name(franchise.name())
-                .build();
         TransactWriteItemsEnhancedRequest request = TransactWriteItemsEnhancedRequest.builder()
-                .addPutItem(table, franchiseItem)
-                .addPutItem(table, TransactPutItemEnhancedRequest.builder(FranchiseItem.class)
-                        .item(nameReservation)
-                        .conditionExpression(NOT_EXISTS)
-                        .build())
+                .addPutItem(table, franchiseItem(franchise.id(), franchise.name()))
+                .addPutItem(table, reserveName(franchise.id(), franchise.name()))
                 .build();
         return Mono.fromFuture(() -> client.transactWriteItems(request))
-                .onErrorMap(DynamoFranchiseRepository::toNameError)
+                .onErrorMap(error -> toNameError(error, 1))
                 .thenReturn(franchise);
+    }
+
+    /**
+     * Updates the name and moves the reservation in one transaction: the old reservation is released only if it
+     * belongs to this franchise, and the new one is taken only if it is free.
+     */
+    @Override
+    public Mono<Franchise> renameFranchise(Franchise franchise, String newName) {
+        String oldNameKey = franchiseNameKey(franchise.name());
+        String newNameKey = franchiseNameKey(newName);
+        TransactWriteItemsEnhancedRequest.Builder request = TransactWriteItemsEnhancedRequest.builder()
+                .addPutItem(table, franchiseItem(franchise.id(), newName));
+        if (oldNameKey.equals(newNameKey)) {
+            // Only the letter case changes: same reservation, just refresh its stored name.
+            request.addPutItem(table, TransactPutItemEnhancedRequest.builder(FranchiseItem.class)
+                    .item(nameReservation(franchise.id(), newName))
+                    .conditionExpression(ownedBy(franchise.id()))
+                    .build());
+        } else {
+            request.addDeleteItem(table, TransactDeleteItemEnhancedRequest.builder()
+                            .key(Key.builder().partitionValue(oldNameKey).sortValue(FRANCHISE_NAME).build())
+                            .conditionExpression(ownedBy(franchise.id()))
+                            .build())
+                    .addPutItem(table, reserveName(franchise.id(), newName));
+        }
+        TransactWriteItemsEnhancedRequest built = request.build();
+        int newReservationIndex = oldNameKey.equals(newNameKey) ? -1 : 2;
+        return Mono.fromFuture(() -> client.transactWriteItems(built))
+                .onErrorMap(error -> toNameError(error, newReservationIndex))
+                .thenReturn(new Franchise(franchise.id(), newName, franchise.branches()));
     }
 
     @Override
@@ -129,10 +144,48 @@ public class DynamoFranchiseRepository implements FranchiseRepository {
                 .onErrorMap(TechnicalException::new);
     }
 
-    private static Throwable toNameError(Throwable error) {
+    private static FranchiseItem franchiseItem(String franchiseId, String name) {
+        return FranchiseItem.builder()
+                .franchiseKey(franchiseKey(franchiseId))
+                .entityKey(FRANCHISE)
+                .type(FRANCHISE)
+                .id(franchiseId)
+                .name(name)
+                .build();
+    }
+
+    private static FranchiseItem nameReservation(String franchiseId, String name) {
+        return FranchiseItem.builder()
+                .franchiseKey(franchiseNameKey(name))
+                .entityKey(FRANCHISE_NAME)
+                .type(FRANCHISE_NAME)
+                .id(franchiseId)
+                .name(name)
+                .build();
+    }
+
+    private static TransactPutItemEnhancedRequest<FranchiseItem> reserveName(String franchiseId, String name) {
+        return TransactPutItemEnhancedRequest.builder(FranchiseItem.class)
+                .item(nameReservation(franchiseId, name))
+                .conditionExpression(NOT_EXISTS)
+                .build();
+    }
+
+    private static Expression ownedBy(String franchiseId) {
+        return Expression.builder()
+                .expression("#id = :id")
+                .putExpressionName("#id", "id")
+                .putExpressionValue(":id", AttributeValue.fromS(franchiseId))
+                .build();
+    }
+
+    /** Name taken only when the condition of the new reservation (its position in the transaction) failed. */
+    private static Throwable toNameError(Throwable error, int reservationIndex) {
         Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
         boolean nameTaken = cause instanceof TransactionCanceledException canceled
-                && canceled.cancellationReasons().stream().anyMatch(reason -> CONDITION_FAILED.equals(reason.code()));
+                && reservationIndex >= 0
+                && canceled.cancellationReasons().size() > reservationIndex
+                && CONDITION_FAILED.equals(canceled.cancellationReasons().get(reservationIndex).code());
         return nameTaken
                 ? new BusinessException(TechnicalMessage.FRANCHISE_NAME_DUPLICATED)
                 : new TechnicalException(error);

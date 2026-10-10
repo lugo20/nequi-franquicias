@@ -18,12 +18,14 @@ public class RouterRest {
     private static final String BRANCHES = "/api/v1/branches";
     private static final String PRODUCTS = "/api/v1/products";
     private static final String CREATE = "/create";
+    private static final String UPDATE_NAME = "/update-name";
     private static final String PRODUCT_PATH = "/{franchiseId}/{branchId}/{productId}";
 
     @Bean
     public RouterFunction<ServerResponse> franchiseRoutes(FranchiseHandler franchiseHandler) {
         return route()
                 .POST(FRANCHISES + CREATE, franchiseHandler::createFranchise)
+                .POST(FRANCHISES + UPDATE_NAME, franchiseHandler::updateName)
                 .GET(FRANCHISES + "/{franchiseId}/get-top-stock", franchiseHandler::getTopStock)
                 .build();
     }

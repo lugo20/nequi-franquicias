@@ -25,9 +25,12 @@ import software.amazon.awssdk.enhanced.dynamodb.model.PagePublisher;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.CancellationReason;
+import software.amazon.awssdk.services.dynamodb.model.Delete;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -100,6 +103,66 @@ class DynamoFranchiseRepositoryTest {
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("dynamo down")));
 
         StepVerifier.create(repository.saveFranchise(new Franchise("f1", "Cafe", null)))
+                .expectError(TechnicalException.class)
+                .verify();
+    }
+
+    @Test
+    void renameFranchiseMovesTheNameReservationInOneTransaction() {
+        givenTableMetadata();
+        when(client.transactWriteItems(any(TransactWriteItemsEnhancedRequest.class)))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        Franchise franchise = new Franchise("f1", "Cafe Express", List.of(new Branch("b1", "Norte", null)));
+
+        StepVerifier.create(repository.renameFranchise(franchise, "Cafe Premium"))
+                .expectNext(new Franchise("f1", "Cafe Premium", franchise.branches()))
+                .verifyComplete();
+
+        List<TransactWriteItem> items = captureTransaction();
+        assertEquals(3, items.size());
+        assertEquals("Cafe Premium", items.get(0).put().item().get("name").s());
+        Delete release = items.get(1).delete();
+        assertEquals("FRANCHISE_NAME#cafe express", release.key().get("franchiseKey").s());
+        assertEquals("#id = :id", release.conditionExpression());
+        assertEquals("f1", release.expressionAttributeValues().get(":id").s());
+        assertEquals("FRANCHISE_NAME#cafe premium", items.get(2).put().item().get("franchiseKey").s());
+        assertEquals("attribute_not_exists(franchiseKey)", items.get(2).put().conditionExpression());
+    }
+
+    @Test
+    void renameFranchiseWithOnlyCaseChangeKeepsTheSameReservation() {
+        givenTableMetadata();
+        when(client.transactWriteItems(any(TransactWriteItemsEnhancedRequest.class)))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        StepVerifier.create(repository.renameFranchise(new Franchise("f1", "cafe express", null), "Cafe Express"))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        List<TransactWriteItem> items = captureTransaction();
+        assertEquals(2, items.size());
+        assertEquals("FRANCHISE_NAME#cafe express", items.get(1).put().item().get("franchiseKey").s());
+        assertEquals("Cafe Express", items.get(1).put().item().get("name").s());
+        assertEquals("#id = :id", items.get(1).put().conditionExpression());
+    }
+
+    @Test
+    void renameFranchiseFailsWithDuplicatedNameWhenTheNewNameIsTaken() {
+        givenTableMetadata();
+        givenTransactionCanceledAt(2);
+
+        StepVerifier.create(repository.renameFranchise(new Franchise("f1", "Cafe", null), "Burger"))
+                .expectErrorSatisfies(error -> assertEquals(TechnicalMessage.FRANCHISE_NAME_DUPLICATED,
+                        ((BusinessException) error).getTechnicalMessage()))
+                .verify();
+    }
+
+    @Test
+    void renameFranchiseIsATechnicalErrorWhenTheOldReservationIsNotOwned() {
+        givenTableMetadata();
+        givenTransactionCanceledAt(1);
+
+        StepVerifier.create(repository.renameFranchise(new Franchise("f1", "Cafe", null), "Burger"))
                 .expectError(TechnicalException.class)
                 .verify();
     }
@@ -197,6 +260,23 @@ class DynamoFranchiseRepositoryTest {
         verify(table).deleteItem(key.capture());
         assertEquals("FRANCHISE#f1", key.getValue().partitionKeyValue().s());
         assertEquals("BRANCH#b1#PRODUCT#p1", key.getValue().sortKeyValue().orElseThrow().s());
+    }
+
+    private List<TransactWriteItem> captureTransaction() {
+        ArgumentCaptor<TransactWriteItemsEnhancedRequest> captor =
+                ArgumentCaptor.forClass(TransactWriteItemsEnhancedRequest.class);
+        verify(client).transactWriteItems(captor.capture());
+        return captor.getValue().transactWriteItems();
+    }
+
+    private void givenTransactionCanceledAt(int failedIndex) {
+        List<CancellationReason> reasons = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            reasons.add(CancellationReason.builder().code(i == failedIndex ? "ConditionalCheckFailed" : "None").build());
+        }
+        TransactionCanceledException canceled = TransactionCanceledException.builder().cancellationReasons(reasons).build();
+        when(client.transactWriteItems(any(TransactWriteItemsEnhancedRequest.class)))
+                .thenReturn(CompletableFuture.failedFuture(new CompletionException(canceled)));
     }
 
     private void givenTableMetadata() {
