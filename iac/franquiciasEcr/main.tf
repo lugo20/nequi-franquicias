@@ -20,11 +20,13 @@ resource "aws_ecr_lifecycle_policy" "app" {
   policy = jsonencode({
     rules = [{
       rulePriority = 1
-      description  = "Keep only the last ${var.images_to_keep} images"
+      description  = "Keep only the last ${var.images_to_keep} tagged images"
+      # Counts tagged versions only: untagged entries belong to an image index and ECR protects them.
       selection = {
-        tagStatus   = "any"
-        countType   = "imageCountMoreThan"
-        countNumber = var.images_to_keep
+        tagStatus      = "tagged"
+        tagPatternList = ["*"]
+        countType      = "imageCountMoreThan"
+        countNumber    = var.images_to_keep
       }
       action = { type = "expire" }
     }]
