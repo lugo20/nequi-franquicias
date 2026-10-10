@@ -374,7 +374,7 @@ Cada carpeta de `iac/` es un componente independiente con su propio state. El st
 |---|---|
 | `bootstrap` | Bucket S3 para el state de Terraform (versionado y cifrado) |
 | `franquiciasDynamo` | Tabla DynamoDB on-demand |
-| `franquiciasEcr` | Repositorio de imágenes (tags inmutables, escaneo, conserva las últimas 5) |
+| `franquiciasEcr` | Repositorio de imágenes (tags inmutables, escaneo, conserva las últimas 5 versiones con tag) |
 | `franquiciasApiGateway` | API Gateway HTTP con la URL pública fija (persistente) |
 | `transversal` | VPC con 2 subnets públicas, ALB interno, VPC Link, ruta de API Gateway y cluster ECS |
 | `ecsFranquicias` | Roles IAM, log group, task definition y servicio Fargate detrás del ALB |
@@ -411,9 +411,11 @@ terraform apply -var-file=env/dev/terraform-dev.tfvars
 TAG=$(git rev-parse --short HEAD)
 REPO=$(terraform -chdir=iac/franquiciasEcr output -raw repository_url)
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${REPO%%/*}
-docker build -f app/deployment/Dockerfile -t $REPO:$TAG app
+docker build --provenance=false -f app/deployment/Dockerfile -t $REPO:$TAG app
 docker push $REPO:$TAG
 ```
+
+`--provenance=false` publica la imagen como una sola entrada en ECR. Sin esa opción, Docker agrega metadatos de procedencia y cada versión ocupa tres entradas (índice, imagen y metadatos).
 
 > **Windows con Docker Desktop:** si `docker login` falla con `The stub received bad data`, es porque el token de ECR excede el tamaño que admite el almacén de credenciales de Windows. Se puede publicar con una configuración temporal de Docker:
 >
