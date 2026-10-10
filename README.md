@@ -245,6 +245,22 @@ Respuesta `201 Created`:
 
 El `stock` debe ser un entero mayor o igual a 0. Errores: `400 INVALID_REQUEST` (sin ids, JSON inválido o stock no entero), `400 INVALID_NAME`, `400 INVALID_STOCK`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND` (también si la sucursal no pertenece a esa franquicia), `409 PRODUCT_NAME_DUPLICATED`.
 
+### Renombrar producto
+
+`POST /products/update-name`
+
+```bash
+curl -X POST $API/products/update-name -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "branchId": "<branchId>", "productId": "<productId>", "name": "Te Verde"}'
+```
+
+Respuesta `200 OK` con el producto actualizado:
+
+```json
+{ "id": "09392798-bcae-40ee-af64-7b657424295b", "name": "Te Verde", "stock": 3 }
+```
+
+El stock no cambia. Errores: `400 INVALID_REQUEST`, `400 INVALID_NAME`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `404 PRODUCT_NOT_FOUND`, `409 PRODUCT_NAME_DUPLICATED`.
+
 ### Eliminar producto
 
 `DELETE /products/{franchiseId}/{branchId}/{productId}/delete`
