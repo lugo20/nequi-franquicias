@@ -43,6 +43,7 @@ public class RouterRest {
         return route()
                 .POST(PRODUCTS + CREATE, productHandler::createProduct)
                 .POST(PRODUCTS + "/update-stock", productHandler::updateStock)
+                .POST(PRODUCTS + UPDATE_NAME, productHandler::updateName)
                 .DELETE(PRODUCTS + PRODUCT_PATH + "/delete", productHandler::deleteProduct)
                 .build();
     }

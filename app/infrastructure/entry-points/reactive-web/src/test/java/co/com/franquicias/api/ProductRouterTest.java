@@ -6,6 +6,7 @@ import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.franchise.Product;
 import co.com.franquicias.usecase.createproduct.CreateProductUseCase;
 import co.com.franquicias.usecase.deleteproduct.DeleteProductUseCase;
+import co.com.franquicias.usecase.updateproductname.UpdateProductNameUseCase;
 import co.com.franquicias.usecase.updateproductstock.UpdateProductStockUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ class ProductRouterTest {
     private CreateProductUseCase createProductUseCase;
     private DeleteProductUseCase deleteProductUseCase;
     private UpdateProductStockUseCase updateProductStockUseCase;
+    private UpdateProductNameUseCase updateProductNameUseCase;
     private WebTestClient client;
 
     @BeforeEach
@@ -31,8 +33,10 @@ class ProductRouterTest {
         createProductUseCase = mock(CreateProductUseCase.class);
         deleteProductUseCase = mock(DeleteProductUseCase.class);
         updateProductStockUseCase = mock(UpdateProductStockUseCase.class);
+        updateProductNameUseCase = mock(UpdateProductNameUseCase.class);
         client = RouterTestSupport.client(new RouterRest().productRoutes(
-                new ProductHandler(createProductUseCase, deleteProductUseCase, updateProductStockUseCase)));
+                new ProductHandler(createProductUseCase, deleteProductUseCase, updateProductStockUseCase,
+                        updateProductNameUseCase)));
     }
 
     @Test
@@ -115,6 +119,28 @@ class ProductRouterTest {
         post("/api/v1/products/update-stock", "{\"franchiseId\":\"f1\",\"branchId\":\"b1\",\"productId\":\"p2\",\"stock\":-1}")
                 .expectStatus().isBadRequest()
                 .expectBody().jsonPath("$.code").isEqualTo("INVALID_STOCK");
+    }
+
+    @Test
+    void updateNameReturns200WithUpdatedProduct() {
+        when(updateProductNameUseCase.execute("f1", "b1", "p2", "Te Verde"))
+                .thenReturn(Mono.just(new Product("p2", "Te Verde", 20)));
+
+        post("/api/v1/products/update-name", "{\"franchiseId\":\"f1\",\"branchId\":\"b1\",\"productId\":\"p2\",\"name\":\"Te Verde\"}")
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.name").isEqualTo("Te Verde")
+                .jsonPath("$.stock").isEqualTo(20);
+    }
+
+    @Test
+    void updateNameReturns409WhenNameIsTaken() {
+        when(updateProductNameUseCase.execute(any(), any(), any(), any()))
+                .thenReturn(Mono.error(new BusinessException(TechnicalMessage.PRODUCT_NAME_DUPLICATED)));
+
+        post("/api/v1/products/update-name", "{\"franchiseId\":\"f1\",\"branchId\":\"b1\",\"productId\":\"p2\",\"name\":\"cafe\"}")
+                .expectStatus().isEqualTo(409)
+                .expectBody().jsonPath("$.code").isEqualTo("PRODUCT_NAME_DUPLICATED");
     }
 
     private WebTestClient.ResponseSpec post(String uri, String body) {
