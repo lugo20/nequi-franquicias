@@ -175,6 +175,22 @@ Respuesta `201 Created`:
 
 Errores: `400 INVALID_REQUEST` (sin `franchiseId` o JSON inválido), `400 INVALID_NAME`, `404 FRANCHISE_NOT_FOUND`, `409 BRANCH_NAME_DUPLICATED`.
 
+### Crear producto
+
+`POST /products/create`
+
+```bash
+curl -X POST $API/products/create -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "branchId": "<branchId>", "name": "Cafe", "stock": 10}'
+```
+
+Respuesta `201 Created`:
+
+```json
+{ "id": "6cc9e8e9-2ef7-4d3f-8512-9143a9d810d7" }
+```
+
+El `stock` debe ser un entero mayor o igual a 0. Errores: `400 INVALID_REQUEST` (sin ids, JSON inválido o stock no entero), `400 INVALID_NAME`, `400 INVALID_STOCK`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND` (también si la sucursal no pertenece a esa franquicia), `409 PRODUCT_NAME_DUPLICATED`.
+
 ## Modelo de datos
 
 Todo se guarda en **una sola tabla de DynamoDB** (diseño *single-table*). Cada franquicia forma un **grupo**: la franquicia, sus sucursales y sus productos comparten la misma clave de partición, así que una sola consulta trae la franquicia completa.

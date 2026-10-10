@@ -2,6 +2,7 @@ package co.com.franquicias.api;
 
 import co.com.franquicias.api.branch.BranchHandler;
 import co.com.franquicias.api.franchise.FranchiseHandler;
+import co.com.franquicias.api.product.ProductHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
@@ -15,6 +16,7 @@ public class RouterRest {
 
     private static final String FRANCHISES = "/api/v1/franchises";
     private static final String BRANCHES = "/api/v1/branches";
+    private static final String PRODUCTS = "/api/v1/products";
     private static final String CREATE = "/create";
 
     @Bean
@@ -28,6 +30,13 @@ public class RouterRest {
     public RouterFunction<ServerResponse> branchRoutes(BranchHandler branchHandler) {
         return route()
                 .POST(BRANCHES + CREATE, branchHandler::createBranch)
+                .build();
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> productRoutes(ProductHandler productHandler) {
+        return route()
+                .POST(PRODUCTS + CREATE, productHandler::createProduct)
                 .build();
     }
 }
