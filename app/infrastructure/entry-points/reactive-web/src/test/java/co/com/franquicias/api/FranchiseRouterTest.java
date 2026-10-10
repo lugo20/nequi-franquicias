@@ -6,6 +6,7 @@ import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.franchise.Franchise;
 import co.com.franquicias.usecase.createfranchise.CreateFranchiseUseCase;
 import co.com.franquicias.usecase.gettopstockproducts.GetTopStockProductsUseCase;
+import co.com.franquicias.usecase.updatefranchisename.UpdateFranchiseNameUseCase;
 import co.com.franquicias.model.franchise.TopStockProduct;
 import reactor.core.publisher.Flux;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,13 +27,16 @@ class FranchiseRouterTest {
 
     private CreateFranchiseUseCase createFranchiseUseCase;
     private GetTopStockProductsUseCase getTopStockProductsUseCase;
+    private UpdateFranchiseNameUseCase updateFranchiseNameUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         createFranchiseUseCase = mock(CreateFranchiseUseCase.class);
         getTopStockProductsUseCase = mock(GetTopStockProductsUseCase.class);
-        FranchiseHandler handler = new FranchiseHandler(createFranchiseUseCase, getTopStockProductsUseCase);
+        updateFranchiseNameUseCase = mock(UpdateFranchiseNameUseCase.class);
+        FranchiseHandler handler = new FranchiseHandler(createFranchiseUseCase, getTopStockProductsUseCase,
+                updateFranchiseNameUseCase);
         client = RouterTestSupport.client(new RouterRest().franchiseRoutes(handler));
     }
 
@@ -111,6 +115,34 @@ class FranchiseRouterTest {
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody().jsonPath("$.code").isEqualTo("FRANCHISE_NOT_FOUND");
+    }
+
+    @Test
+    void updateNameReturns200WithIdAndName() {
+        when(updateFranchiseNameUseCase.execute("f1", "Cafe Premium"))
+                .thenReturn(Mono.just(new Franchise("f1", "Cafe Premium", List.of())));
+
+        client.post().uri("/api/v1/franchises/update-name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"franchiseId\":\"f1\",\"name\":\"Cafe Premium\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("f1")
+                .jsonPath("$.name").isEqualTo("Cafe Premium");
+    }
+
+    @Test
+    void updateNameReturns409WhenNameIsTaken() {
+        when(updateFranchiseNameUseCase.execute(any(), any()))
+                .thenReturn(Mono.error(new BusinessException(TechnicalMessage.FRANCHISE_NAME_DUPLICATED)));
+
+        client.post().uri("/api/v1/franchises/update-name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"franchiseId\":\"f1\",\"name\":\"Burger Town\"}")
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody().jsonPath("$.code").isEqualTo("FRANCHISE_NAME_DUPLICATED");
     }
 
     private WebTestClient.ResponseSpec post(String body) {
