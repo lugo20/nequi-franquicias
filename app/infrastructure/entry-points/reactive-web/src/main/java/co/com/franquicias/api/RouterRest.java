@@ -18,6 +18,7 @@ public class RouterRest {
     private static final String BRANCHES = "/api/v1/branches";
     private static final String PRODUCTS = "/api/v1/products";
     private static final String CREATE = "/create";
+    private static final String PRODUCT_PATH = "/{franchiseId}/{branchId}/{productId}";
 
     @Bean
     public RouterFunction<ServerResponse> franchiseRoutes(FranchiseHandler franchiseHandler) {
@@ -37,6 +38,7 @@ public class RouterRest {
     public RouterFunction<ServerResponse> productRoutes(ProductHandler productHandler) {
         return route()
                 .POST(PRODUCTS + CREATE, productHandler::createProduct)
+                .DELETE(PRODUCTS + PRODUCT_PATH + "/delete", productHandler::deleteProduct)
                 .build();
     }
 }
