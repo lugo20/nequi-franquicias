@@ -159,6 +159,22 @@ Respuesta `201 Created`:
 
 Errores: `400 INVALID_NAME`, `400 INVALID_REQUEST`, `409 FRANCHISE_NAME_DUPLICATED`.
 
+### Renombrar franquicia
+
+`POST /franchises/update-name`
+
+```bash
+curl -X POST $API/franchises/update-name -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "name": "Cafe Premium"}'
+```
+
+Respuesta `200 OK`:
+
+```json
+{ "id": "605fe9b8-1002-4c1e-8a95-d201a4c03f55", "name": "Cafe Premium" }
+```
+
+El nombre anterior queda libre para otras franquicias. Errores: `400 INVALID_REQUEST`, `400 INVALID_NAME`, `404 FRANCHISE_NOT_FOUND`, `409 FRANCHISE_NAME_DUPLICATED`.
+
 ### Producto con más stock por sucursal
 
 `GET /franchises/{franchiseId}/get-top-stock`
