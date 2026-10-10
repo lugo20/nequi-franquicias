@@ -159,6 +159,28 @@ Respuesta `201 Created`:
 
 Errores: `400 INVALID_NAME`, `400 INVALID_REQUEST`, `409 FRANCHISE_NAME_DUPLICATED`.
 
+### Producto con más stock por sucursal
+
+`GET /franchises/{franchiseId}/get-top-stock`
+
+```bash
+curl $API/franchises/<franchiseId>/get-top-stock
+```
+
+Respuesta `200 OK`: un producto por sucursal (el de mayor stock), con la sucursal a la que pertenece, ordenado por nombre de sucursal:
+
+```json
+[
+  { "branchId": "ecec5e67-...", "branchName": "Norte", "productId": "18b50970-...", "productName": "Cafe", "stock": 10 },
+  { "branchId": "1a0079c5-...", "branchName": "Sur", "productId": "82b5da73-...", "productName": "Jugo", "stock": 7 }
+]
+```
+
+- Si dos productos empatan en stock, se devuelve el primero por nombre.
+- Las sucursales sin productos no aparecen; si ninguna tiene productos, la respuesta es `[]`.
+
+Errores: `404 FRANCHISE_NOT_FOUND`.
+
 ### Crear sucursal
 
 `POST /branches/create`
