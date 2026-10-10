@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: nequi-franquicias
+  jackson:
+    deserialization:
+      # Reject 1.5 for an integer field instead of silently truncating it to 1.
+      accept-float-as-int: false
 
 management:
   endpoints:

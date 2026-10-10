@@ -1,0 +1,28 @@
+package co.com.franquicias.api.product;
+
+import co.com.franquicias.api.dto.CreateProductRequest;
+import co.com.franquicias.api.dto.IdResponse;
+import co.com.franquicias.model.enums.TechnicalMessage;
+import co.com.franquicias.model.exceptions.BusinessException;
+import co.com.franquicias.usecase.createproduct.CreateProductUseCase;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.server.ServerRequest;
+import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.publisher.Mono;
+
+@Component
+@RequiredArgsConstructor
+public class ProductHandler {
+
+    private final CreateProductUseCase createProductUseCase;
+
+    public Mono<ServerResponse> createProduct(ServerRequest request) {
+        return request.bodyToMono(CreateProductRequest.class)
+                .switchIfEmpty(Mono.error(new BusinessException(TechnicalMessage.INVALID_REQUEST)))
+                .flatMap(body -> createProductUseCase.execute(body.franchiseId(), body.branchId(), body.name(), body.stock()))
+                .flatMap(product -> ServerResponse.status(HttpStatus.CREATED)
+                        .bodyValue(new IdResponse(product.id())));
+    }
+}
