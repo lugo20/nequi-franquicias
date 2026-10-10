@@ -34,6 +34,7 @@ public class RouterRest {
     public RouterFunction<ServerResponse> branchRoutes(BranchHandler branchHandler) {
         return route()
                 .POST(BRANCHES + CREATE, branchHandler::createBranch)
+                .POST(BRANCHES + UPDATE_NAME, branchHandler::updateName)
                 .build();
     }
 

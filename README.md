@@ -213,6 +213,22 @@ Respuesta `201 Created`:
 
 Errores: `400 INVALID_REQUEST` (sin `franchiseId` o JSON inválido), `400 INVALID_NAME`, `404 FRANCHISE_NOT_FOUND`, `409 BRANCH_NAME_DUPLICATED`.
 
+### Renombrar sucursal
+
+`POST /branches/update-name`
+
+```bash
+curl -X POST $API/branches/update-name -H "Content-Type: application/json" -d '{"franchiseId": "<franchiseId>", "branchId": "<branchId>", "name": "Norte Plaza"}'
+```
+
+Respuesta `200 OK`:
+
+```json
+{ "id": "a8f279d5-c73a-478d-a85a-12d6824674d1", "name": "Norte Plaza" }
+```
+
+Los productos de la sucursal no cambian. Errores: `400 INVALID_REQUEST`, `400 INVALID_NAME`, `404 FRANCHISE_NOT_FOUND`, `404 BRANCH_NOT_FOUND`, `409 BRANCH_NAME_DUPLICATED`.
+
 ### Crear producto
 
 `POST /products/create`
