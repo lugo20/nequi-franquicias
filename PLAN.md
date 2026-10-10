@@ -13,8 +13,8 @@ Plan de implementación de la prueba técnica Nequi: API para gestionar franquic
 | Persistencia | DynamoDB, diseño single-table |
 | API | Acción en la URL (`/create`, `/update-name`…), solo GET, POST y DELETE; POST recibe todo en el body; códigos HTTP; errores `{code, message}` |
 | Local | docker-compose con DynamoDB Local; Dockerfile multi-stage |
-| Nube | AWS us-east-1: ECS Fargate + ALB público HTTP |
-| Red | VPC nueva, tasks en subnets públicas sin NAT; SG de tasks solo acepta tráfico del ALB |
+| Nube | AWS us-east-1: API Gateway HTTP (URL fija, HTTPS) → VPC Link → ALB interno → ECS Fargate |
+| Red | VPC nueva, tasks en subnets públicas sin NAT; ALB interno solo accesible desde el VPC Link; SG de tasks solo acepta tráfico del ALB |
 | IaC | Terraform con `terraform-aws-modules`; solo ambiente `dev` |
 | State Terraform | Bucket S3 versionado y cifrado, lock con `use_lockfile` |
 | CI/CD | Sin pipeline; despliegue manual documentado |
@@ -72,6 +72,7 @@ nequi-franquicias/
 │   ├── bootstrap/
 │   ├── franquiciasDynamo/
 │   ├── franquiciasEcr/
+│   ├── franquiciasApiGateway/
 │   ├── transversal/
 │   └── ecsFranquicias/
 ├── docker-compose.yml
@@ -140,6 +141,11 @@ Cada commit incluye las pruebas de su código: el build exige 80 % de cobertura 
     - `docs: agrega guía de despliegue en AWS al README`
     - Validar `POST /franchises` vía URL del ALB.
     - **Destroy** de `ecsFranquicias` y `transversal` para no pagar ALB y Fargate mientras se desarrolla.
+11b. `feature/iac-api-gateway` (URL fija)
+    - `feat(iac): agrega API Gateway HTTP con stage por defecto` (componente persistente)
+    - `refactor(iac): convierte el ALB en interno y conecta API Gateway por VPC Link`
+    - `refactor(iac): expone la URL de API Gateway como api_url`
+    - `docs: documenta la arquitectura con API Gateway`
 
 ### Fase C - Resto de endpoints
 
@@ -161,16 +167,17 @@ Cada rama: `feat(usecase)` con su test → `feat(api)` handler y ruta con su tes
     - `docs: revisión final del README`
     - **Re-apply** de `transversal` y `ecsFranquicias` y push de la imagen final.
 21. `release/1.0.0` → PR a `main` → tag `v1.0.0` → merge de vuelta a `develop`.
-    - Al terminar la evaluación: **destroy** total en orden `ecsFranquicias` → `transversal` → `franquiciasEcr` → `franquiciasDynamo` → `bootstrap`.
+    - Al terminar la evaluación: **destroy** total en orden `ecsFranquicias` → `transversal` → `franquiciasApiGateway` → `franquiciasEcr` → `franquiciasDynamo` → `bootstrap`.
 
 ## Orden de despliegue
 
 1. `bootstrap` (state local)
 2. `franquiciasDynamo`
 3. `franquiciasEcr`
-4. `docker build` + `docker push` a ECR
-5. `transversal`
-6. `ecsFranquicias`
+4. `franquiciasApiGateway`
+5. `docker build` + `docker push` a ECR
+6. `transversal`
+7. `ecsFranquicias`
 
 ## Requisitos locales
 
