@@ -1,17 +1,14 @@
 package co.com.franquicias.api;
 
-import co.com.franquicias.api.error.GlobalErrorHandler;
 import co.com.franquicias.api.franchise.FranchiseHandler;
 import co.com.franquicias.model.enums.TechnicalMessage;
 import co.com.franquicias.model.exceptions.BusinessException;
 import co.com.franquicias.model.franchise.Franchise;
 import co.com.franquicias.usecase.createfranchise.CreateFranchiseUseCase;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.reactive.function.server.HandlerStrategies;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -31,14 +28,7 @@ class FranchiseRouterTest {
     void setUp() {
         createFranchiseUseCase = mock(CreateFranchiseUseCase.class);
         FranchiseHandler handler = new FranchiseHandler(createFranchiseUseCase);
-        client = WebTestClient
-                .bindToRouterFunction(new RouterRest().routerFunction(handler))
-                // empty() avoids Spring's default 400 handler so errors reach ours, as in the running app.
-                .handlerStrategies(HandlerStrategies.empty()
-                        .codecs(codecs -> codecs.registerDefaults(true))
-                        .exceptionHandler(new GlobalErrorHandler(new ObjectMapper()))
-                        .build())
-                .build();
+        client = RouterTestSupport.client(new RouterRest().franchiseRoutes(handler));
     }
 
     @Test
