@@ -11,6 +11,9 @@ public interface FranchiseRepository {
 
     Mono<Franchise> saveFranchise(Franchise franchise);
 
+    /** Renames the franchise and moves its name reservation atomically. */
+    Mono<Franchise> renameFranchise(Franchise franchise, String newName);
+
     Mono<Branch> saveBranch(String franchiseId, Branch branch);
 
     Mono<Product> saveProduct(String franchiseId, String branchId, Product product);
